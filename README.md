@@ -29,10 +29,6 @@ The browser will show a localhost connection error during sign-in. This is expec
 
 Credentials and tokens are encrypted for your Windows account. See [privacy/security and limitations](docs/SECURITY.md).
 
-## Before relying on it
-
-Verify your first intentional time entry in FreshBooks. Automated checks use offline data; live time-entry writes were not part of release verification. Review related invoices after editing billed time. Notifications depend on Windows settings. Long-running stability, mixed-DPI monitors and screen-reader support need further testing.
-
 ## Source and development
 
 See [development instructions](docs/DEVELOPING.md). Source is in `src/`; tests in `tests/`; build tools in `scripts/`. Release binaries are attached to Releases rather than committed to Git.

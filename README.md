@@ -34,3 +34,7 @@ Credentials and tokens are encrypted for your Windows account. See [privacy/secu
 See [development instructions](docs/DEVELOPING.md). Source is in `src/`; tests in `tests/`; build tools in `scripts/`. Release binaries are attached to Releases rather than committed to Git.
 
 MIT licensed. Third-party fonts retain their own [license](src/assets/fonts/OFL-IBM-Plex.txt).
+
+## AI disclosure
+
+FreshTray was created with the assistance of AI tools for code generation, debugging, documentation, and UI development.

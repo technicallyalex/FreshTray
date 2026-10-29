@@ -7,7 +7,7 @@ Independent community app; not affiliated with or endorsed by FreshBooks.
 ## Download and run
 
 1. Open [Releases](https://github.com/technicallyalex/FreshTray/releases/latest).
-2. Download **FreshTray-2.7.0-Windows-x64.zip** under Assets. You do not need GitHub's Source code downloads.
+2. Download **FreshTray-0.1-Windows-x64.zip** under Assets. You do not need GitHub's Source code downloads.
 3. Right-click the ZIP and choose **Extract All**. Keep the extracted folder somewhere permanent.
 4. Open the folder and double-click **Run FreshTray.cmd**. Python is not required. Do not move FreshTray.exe away from its `_internal` folder.
 5. For a preview without an account, double-click **Preview.cmd**.

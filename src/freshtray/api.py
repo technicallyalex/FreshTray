@@ -10,6 +10,7 @@ from urllib.parse import urlencode, urlsplit, parse_qs, quote
 from urllib.request import Request, build_opener, HTTPRedirectHandler
 
 from .model import matching_entry
+from . import __version__
 
 API = "https://api.freshbooks.com"
 SCOPES = "user:profile:read user:clients:read user:projects:read user:billable_items:read user:time_entries:read user:time_entries:write"
@@ -32,7 +33,7 @@ class Transport:
         self.opener = build_opener(NoRedirect())
 
     def __call__(self, method, path, body=None, token=None):
-        headers = {"Accept": "application/json", "User-Agent": "FreshTray/1.0"}
+        headers = {"Accept": "application/json", "User-Agent": "FreshTray/" + __version__}
         if token:
             headers["Authorization"] = "Bearer " + token
         data = None

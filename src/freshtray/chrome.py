@@ -44,6 +44,7 @@ class WindowChrome:
         self.user.SetWindowPos(hwnd,None,0,0,0,0,0x37)
 
     def drag_start(self,event):
+        self.app.transition.cancel();self.thaw()
         self.drag_end()
         rect=wintypes.RECT()
         self.user.GetWindowRect.argtypes=[wintypes.HWND,ctypes.POINTER(wintypes.RECT)]
@@ -80,9 +81,11 @@ class WindowChrome:
             self.app.pages[self.app.active_page].activate()
 
     def minimize(self):
+        self.app.transition.cancel();self.thaw()
         self.root.iconify()
 
     def maximize(self):
+        self.app.transition.cancel();self.thaw()
         if not self.app.prefs.data.get('docked_mode'):
             self.root.state('normal' if self.root.state()=='zoomed' else 'zoomed')
 
@@ -124,10 +127,10 @@ class CaptionIcon(tk.Canvas):
         self.paint()
 
     def paint(self):
-        bg=('#B62D42' if self.kind=='close' else '#164B91') if self.hover else self.palette['header']
+        bg=('#B62D42' if self.kind=='close' else self.palette.get('selection','#E2EFFE')) if self.hover else self.palette['header']
         self.configure(background=bg)
         self.delete('all')
-        ink=self.palette['header_text']
+        ink='#FFFFFF' if self.hover and self.kind=='close' else self.palette['header_text']
         if self.kind=='minimize':self.create_line(11,17,21,17,fill=ink,width=1.5)
         elif self.kind=='maximize':self.create_rectangle(11,9,21,19,outline=ink,width=1.5)
         else:

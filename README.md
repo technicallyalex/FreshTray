@@ -1,39 +1,45 @@
-# FreshTray
+# FreshTray 0.2
 
-A Windows system-tray app for logging time to FreshBooks. Add time, review a monthly calendar, edit entries, and set an end-of-day reminder. Supports light/dark themes, a taskbar-style docked panel, and encrypted local credentials.
+A complete overhaul of FreshTray, the Windows tray app for logging time to FreshBooks.
 
-Independent community app; not affiliated with or endorsed by FreshBooks.
+![FreshTray monthly calendar and entry form](docs/images/monthly-hours.png)
 
-## Download and run
+## What's new
 
-1. Open [Releases](https://github.com/technicallyalex/FreshTray/releases/latest).
-2. Download **FreshTray-0.1-Windows-x64.zip** under Assets. You do not need GitHub's Source code downloads.
-3. Right-click the ZIP and choose **Extract All**. Keep the extracted folder somewhere permanent.
-4. Open the folder and double-click **Run FreshTray.cmd**. Python is not required. Do not move FreshTray.exe away from its `_internal` folder.
-5. For a preview without an account, double-click **Preview.cmd**.
+- **Rebuilt with Qt Quick.** A new PySide6 / QML interface with responsive layouts, display scaling and smoother panel transitions.
+- **A cleaner, cohesive design.** Folder-style tabs, rounded controls, light and dark themes, and a monthly calendar with time-entry editing built in.
+- **A better reminder popup.** An animated punchcard, draggable placement that is remembered, a Remind me timer, and separate sound choices for daily and follow-up reminders.
 
-Requires Windows 10/11 x64. This portable release is unsigned; Windows may show a publisher warning. Only run a download you trust. Do not disable Windows security protections.
+The popup is an app window, separate from Windows notification banners. It can still open when Windows notifications are disabled or Do Not Disturb is on. FreshTray must be running, the popup enabled, and the desktop available. [Reminder details](docs/USAGE.md#reminders).
 
-## Connect FreshBooks
+## Get started
 
-You need a FreshBooks account and your **own FreshBooks developer application**. The download contains no shared API credentials. Setup takes a few steps; follow the [step-by-step setup guide](docs/SETUP.md).
+**0.2 is awaiting review.** Its download will be added after approval. The [currently published release](https://github.com/technicallyalex/FreshTray/releases) remains 0.1 until then.
 
-The browser will show a localhost connection error during sign-in. This is expected: copy its complete address into the app to finish connecting. The guide explains exactly where.
+For the prepared 0.2 build:
+
+1. Download **FreshTray-0.2.exe** from the 0.2 release's Assets when available.
+2. Keep it in a permanent folder and double-click it. No installer, Python or companion runtime folder is needed.
+3. Open **Settings > FreshBooks connection** and follow the [setup guide](docs/SETUP.md). You need your own FreshBooks developer application; no shared credentials are included.
+4. Set a reminder time under **Settings > Preferences**, then use **Test reminder**.
+
+Windows 10/11 x64 is required. The executable is unsigned, so Windows may show a publisher warning. Settings and encrypted account data remain in your Windows profile rather than inside the EXE.
+
+Upgrading? Finish syncing pending changes, quit the old copy from its tray menu, and open the new EXE. Existing account settings are reused. If you move the app, update **Start with Windows** from the new location.
 
 ## Daily use
 
-- **Log time:** choose a business/client, hours, date and note; optionally choose project/service and Billable.
-- **Monthly hours:** select a day to add time directly. Select a row and choose Edit to update it. Use Refresh to see changes made outside the app; tab switching reuses loaded data.
-- **Settings:** set the reminder time, startup, theme, Always on top, Docked mode, and whether X hides to tray or quits. Click Save settings.
-- Click the tray clock to reopen. To fully exit, right-click it and choose Quit FreshTray.
+Choose a business, client, date, hours and note in **Log time**, or select a day in **Monthly hours** to add, edit or delete an entry there. Common selections are remembered. Settings apply automatically.
 
-Credentials and tokens are encrypted for your Windows account. See [privacy/security and limitations](docs/SECURITY.md).
+Downloaded account lists and calendar months are cached locally. Add, edit and delete entries offline; FreshTray syncs saved changes when the connection returns and asks for review if it detects a conflict or uncertain submission. Connect and open the months you need before going offline.
 
-## Source and development
+See the [illustrated usage guide](docs/USAGE.md), [release notes](docs/RELEASE_NOTES.md) and [privacy/security details](docs/SECURITY.md).
 
-See [development instructions](docs/DEVELOPING.md). Source is in `src/`; tests in `tests/`; build tools in `scripts/`. Release binaries are attached to Releases rather than committed to Git.
+## Source and license
 
-The application code is [MIT licensed](LICENSE). Preserve its copyright and permission notice when redistributing copies or substantial portions. Bundled fonts, Python/runtime components and PyInstaller-related files retain their own terms; see [third-party notices and release limits](docs/THIRD_PARTY_NOTICES.md).
+[Development and build instructions](docs/DEVELOPING.md). App code is [MIT licensed](LICENSE); fonts, Qt and other runtime components retain their own terms in [third-party notices](docs/THIRD_PARTY_NOTICES.md). This is an independent community app, not affiliated with or endorsed by FreshBooks.
+
+Screenshots use fictional account and time-entry data generated by the included capture script.
 
 ## AI disclosure
 
@@ -42,3 +48,5 @@ FreshTray was created with AI assistance for code generation, debugging, documen
 OpenAI Codex was used for the 2026-10-31 repository audit and to draft these disclosure and licensing documentation changes. This describes this audit only and does not establish earlier Codex use.
 
 AI assistance does not change the project's license or establish rights in third-party code or assets.
+
+OpenAI Codex also assisted with the 0.2 overhaul, testing and documentation.

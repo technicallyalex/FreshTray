@@ -221,6 +221,7 @@ class MonthlyEditor(ttk.Frame):
             if not app.demo:
                 app.tray.notify('Time updated' if original else 'Time logged', 'Your time entry was saved to FreshBooks.')
             history.saved_entry(entry, text)
+            app.feedback.show(text)
 
         work = (lambda: app.api.update_entry(bid, original['id'], payload, original)) if original else lambda: app.api.submit(bid, payload)
         app.run(work, saved, 'Previewing…' if app.demo else ('Updating your time entry…' if original else 'Saving your time entry…'),

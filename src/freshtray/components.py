@@ -73,8 +73,8 @@ class WrapLabel(ttk.Label):
 
 
 def card(parent, title=None, subtitle=None):
-    outer = ttk.Frame(parent, style="Card.TFrame", padding=10)
-    outer.pack(fill="x", pady=(0, 8))
+    outer = ttk.Frame(parent, style="Card.TFrame", padding=12)
+    outer.pack(fill="x", pady=(0, 10))
     if title:
         ttk.Label(outer, text=title, style="Section.TLabel").pack(anchor="w", pady=(0, 4))
     if subtitle:

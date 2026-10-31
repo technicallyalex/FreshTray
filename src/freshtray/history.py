@@ -34,20 +34,20 @@ class MonthlyView(ttk.Frame):
         self.month_choice.pack(side="left")
         self.month_choice.bind("<<ComboboxSelected>>", lambda event: self.jump_month())
         self.year_value = tk.StringVar(value=str(self.month.year))
-        self.year_choice = ttk.Spinbox(header, textvariable=self.year_value, from_=1, to=9998, width=5, command=self.jump_month)
+        self.year_choice = ttk.Combobox(header, textvariable=self.year_value, state="readonly",
+                                        values=list(range(min(9998, date.today().year+20), max(1, date.today().year-20)-1, -1)), width=6, height=12)
         self.year_choice.pack(side="left", padx=7)
+        self.year_choice.bind("<<ComboboxSelected>>", lambda event: self.jump_month())
         self.year_choice.bind("<Return>", lambda event: self.jump_month())
         self.controls.extend([self.month_choice, self.year_choice])
-        self.control(header, "Go", self.jump_month, width=4).pack(side="left")
-        tools = ttk.Frame(calendar_card, style="CardBody.TFrame")
-        tools.pack(fill="x", pady=(0, 8))
-        self.control(tools, "Today", self.today).pack(side="left")
-        self.control(tools, "Refresh", self.refresh).pack(side="left", padx=8)
+        self.control(header, "Today", self.today).pack(side="left", padx=(6, 0))
         self.total_text = tk.StringVar(value="Monthly total: —")
-        ttk.Label(tools, textvariable=self.total_text, style="Section.TLabel").pack(side="right")
         self.month_grid = CalendarGrid(calendar_card)
         self.month_grid.pack(fill="x")
-        ttk.Label(calendar_card, text="• Time logged", style="CalendarLegend.TLabel").pack(anchor="w", pady=(5, 0))
+        summary = ttk.Frame(calendar_card, style="CardBody.TFrame")
+        summary.pack(fill="x", pady=(8, 0))
+        ttk.Label(summary, text="• Time logged", style="CalendarLegend.TLabel").pack(side="left")
+        ttk.Label(summary, textvariable=self.total_text, style="Section.TLabel").pack(side="right")
         details = card(body)
         self.day_text = tk.StringVar()
         WrapLabel(details, textvariable=self.day_text, style="Section.TLabel").pack(fill="x", pady=(0, 7))
@@ -111,20 +111,17 @@ class MonthlyView(ttk.Frame):
 
     def set_busy(self, value):
         for control in self.controls:
-            control.configure(state="disabled" if value else ("readonly" if control is self.month_choice else "normal"))
+            control.configure(state="disabled" if value else ("readonly" if isinstance(control, ttk.Combobox) else "normal"))
         for button in self.day_buttons.values():
             button.configure(state="disabled" if value else "normal")
         self.update_actions()
         self.editor.update_enabled()
 
-    def refresh(self, saved_status=None, selected_id=None):
+    def refresh(self, saved_status=None, selected_id=None, force=True):
         if self.app.busy or not self.winfo_exists():
             return
-        self.entries, self.totals = [], {}
-        self.data_loaded = False
-        self.status.set("Loading logged hours from FreshBooks…" if not self.app.demo else "Loading offline sample entries…")
-        self.render_grid()
-        self.show_day()
+        if force:
+            self.app.api.clear("month")
         month = self.month
         business_id, identity = self.business["id"], self.profile["id"]
 
@@ -146,6 +143,16 @@ class MonthlyView(ttk.Frame):
                 self.status.set(text + " Use Refresh to try again.")
                 self.set_busy(False)
 
+        if not force:
+            cached=self.app.api.peek_month(business_id,month,identity)
+            if cached is not None:
+                loaded(cached)
+                return
+        self.entries, self.totals = [], {}
+        self.data_loaded = False
+        self.status.set("Loading logged hours from FreshBooks…" if not self.app.demo else "Loading offline sample entries…")
+        self.render_grid()
+        self.show_day()
         self.app.run(lambda: self.app.api.entries_for_month(business_id, month, identity), loaded,
                      "Loading monthly hours…", on_error=failed)
 
@@ -154,14 +161,16 @@ class MonthlyView(ttk.Frame):
             return
         if not self.editor.confirm_discard():
             self.month_choice.current(self.month.month - 1)
+            self.year_choice.configure(values=list(range(min(9998, self.month.year+20), max(1, self.month.year-20)-1, -1)))
             self.year_value.set(str(self.month.year))
             return
         self.month = month.replace(day=1)
         self.selected_day = selected or self.month.replace(day=min(self.selected_day.day, calendar.monthrange(month.year, month.month)[1]))
         self.month_choice.current(self.month.month - 1)
+        self.year_choice.configure(values=list(range(min(9998, self.month.year+20), max(1, self.month.year-20)-1, -1)))
         self.year_value.set(str(self.month.year))
         self.editor.reset_for_day(self.selected_day)
-        self.refresh()
+        self.refresh(force=False)
 
     def shift_month(self, offset):
         if self.app.busy:
@@ -234,7 +243,8 @@ class MonthlyView(ttk.Frame):
                 return
             self.selected_day = day
             self.editor.reset_for_day(day)
-        self.render_grid()
+        for chosen, button in self.day_buttons.items():
+            button.configure(style="SelectedMonthDay.TButton" if chosen == self.selected_day else "MonthDay.TButton")
         self.show_day()
         if changed:
             self.reveal_editor()
@@ -313,6 +323,7 @@ class MonthlyView(ttk.Frame):
         self.selected_day = entry_date(entry)
         self.month = self.selected_day.replace(day=1)
         self.month_choice.current(self.month.month - 1)
+        self.year_choice.configure(values=list(range(min(9998, self.month.year+20), max(1, self.month.year-20)-1, -1)))
         self.year_value.set(str(self.month.year))
         self.editor.reset_for_day(self.selected_day)
         self.refresh(saved_status=text, selected_id=entry["id"])

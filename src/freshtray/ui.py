@@ -16,6 +16,10 @@ from .layout import build_shell
 from .components import ScrollPage
 from .sizing import LaunchFit
 from .docking import DockedMode
+from .read_cache import ReadCache
+from .skeleton import LoadingSkeleton
+from .feedback import Feedback, PanelTransition
+from .reminders import ReminderPopup
 from .history_model import edit_payload, entry_date, hours_input, format_duration, edit_restriction
 
 BG = "#F3F6FA"
@@ -27,10 +31,14 @@ GREEN = "#087F5B"
 class App:
     def __init__(self, root, api, vault, preferences, assets, launcher, demo=False):
         self.root, self.api, self.vault, self.prefs = root, api, vault, preferences
+        self.api = ReadCache(api)
+        self.loading = LoadingSkeleton(self)
         self.launcher, self.demo = launcher, demo
         self.events = queue.Queue()
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.busy, self.attempt, self.settings_window = False, None, None
+        self.reminder_popup = None
+        self.delivered_reminder_day = None
         self.calendar_window = None
         self.history_window = None
         self.was_maximized = False
@@ -47,12 +55,14 @@ class App:
         self.root.protocol("WM_DELETE_WINDOW", self.close_window)
         self.appearance = Appearance(root, preferences.data["theme"])
         self.build()
+        self.feedback = Feedback(self)
+        self.transition = PanelTransition(self)
         self.launch_fit = LaunchFit(self)
         self.docking = DockedMode(self)
         self.docking.apply()
         self.apply_topmost()
         self.tray = Tray(self.events, assets / "freshtray.ico")
-        root.after(150, self.poll)
+        root.after(40, self.poll)
         root.after(1000, self.tick)
         if self.api.connected:
             self.load_profile()
@@ -74,12 +84,15 @@ class App:
     def select_page(self, name):
         changed = getattr(self, "active_page", None) != name
         if changed and hasattr(self, "chrome"):
+            if hasattr(self, "transition"):self.transition.cancel()
             self.chrome.freeze()
         self.active_page = name
         self.page_host.select(self.pages[name])
         for key in self.pages:
             self.nav_buttons[key].configure(style="NavActive.TButton" if key == name else "Nav.TButton")
         self.pages[name].activate()
+        if changed and hasattr(self, "chrome") and self.chrome.frozen:
+            self.chrome.cover.lift()
         if changed and hasattr(self, "launch_fit"):
             self.launch_fit.pending = True
             self.launch_fit.schedule()
@@ -93,7 +106,8 @@ class App:
             self.quit()
 
     def finish_panel_transition(self):
-        self.chrome.thaw()
+        if self.root.state() != "normal" or not self.launch_fit.is_ready:
+            self.chrome.thaw()
 
     def refresh_pages(self, event=None):
         for page in self.pages.values():
@@ -153,6 +167,8 @@ class App:
         self.select_page("history")
         self.show()
         if self.busy:
+            if self.history_window is None:
+                self.root.after(100, self.open_history_when_ready)
             return
         if not self.profile_data or not self.businesses:
             self.load_profile()
@@ -163,13 +179,19 @@ class App:
                 self.history_window.destroy()
             else:
                 if not self.history_window.data_loaded:
-                    self.history_window.refresh()
+                    self.history_window.refresh(force=False)
                 return
         self.history_window = MonthlyView(self, business, self.profile_data)
         self.history_window.pack(fill="both", expand=True)
+        self.launch_fit.pending = True
+        self.launch_fit.schedule()
         self.appearance.repaint()
-        self.history_window.refresh()
+        self.history_window.refresh(force=False)
 
+
+    def open_history_when_ready(self):
+        if self.active_page == 'history' and self.history_window is None:
+            self.open_history()
 
     def add_for_day(self, day, business_id):
         if self.busy or self.selected_business()["id"] != business_id or not self.confirm_replace_form():
@@ -270,6 +292,8 @@ class App:
         self.set_busy(True)
         self.status.set(message)
         future = self.executor.submit(work)
+        if message.startswith("Loading"):
+            self.loading.start(future)
         future.add_done_callback(lambda completed: self.events.put(("result", (completed, done, on_error))))
 
     def poll(self):
@@ -280,6 +304,7 @@ class App:
                 break
             if event == "result":
                 future, done, on_error = value
+                self.loading.stop()
                 self.set_busy(False)
                 try:
                     done(future.result())
@@ -287,7 +312,7 @@ class App:
                     # Only approved, sanitized messages are shown; never raw network data.
                     text = str(exc) if isinstance(exc, (ApiError, ValueError)) else "Could not complete the action. Check local storage and try again."
                     if self.vault.get("pending"):
-                        text += " A submission is pending: use Check pending before adding more time."
+                        text += " A submission is pending: open Settings > Show connection setup > Check pending save before adding more time."
                     self.status.set(text)
                     if on_error:
                         on_error(text)
@@ -307,9 +332,10 @@ class App:
             elif event == "tray_error":
                 self.show()
                 self.status.set(value)
-        self.root.after(150, self.poll)
+        self.root.after(40, self.poll)
 
     def load_profile(self):
+        self.api.clear()
         if self.busy:
             return
         if self.editing_entry:
@@ -433,6 +459,7 @@ class App:
                 self.note.delete("1.0", "end")
             self.form_baseline = self._form_state()
             self.status.set(text)
+            self.feedback.show(text)
             if not self.demo:
                 self.tray.notify("Time updated" if original else "Time logged", "Your time entry was saved to FreshBooks.")
             if self.history_window and self.history_window.winfo_exists():
@@ -450,6 +477,7 @@ class App:
                 self.status.set("Pending entry kept safely. Review FreshBooks, then use Settings.")
             else:
                 self.status.set("Confirmed the entry was saved." if result else "No pending submissions.")
+                self.feedback.show(self.status.get())
                 if result and self.editing_entry and str(self.editing_entry["id"]) == str(result["id"]):
                     self.cancel_edit(confirm=False)
                 if self.history_window and self.history_window.winfo_exists():
@@ -491,6 +519,9 @@ class App:
                 self.status.set("Could not save window size.")
 
     def hide(self):
+        self.transition.cancel()
+        self.chrome.thaw()
+        self.feedback.clear()
         if self.calendar_window and self.calendar_window.winfo_exists():
             self.calendar_window.close()
         self.was_maximized = self.root.state() == "zoomed"
@@ -505,13 +536,31 @@ class App:
             if not self.note.get("1.0", "end-1c").strip() and self.day.get() == self.last_date.isoformat():
                 self.day.set(now.date().isoformat())
             self.last_date = now.date()
-        if reminder_due(self.prefs.data, now):
-            try:
-                self.prefs.save(last_reminded=now.date().isoformat())
-                self.tray.notify()
-            except OSError:
-                self.status.set("Could not save reminder state. Check local storage.")
+        if reminder_due(self.prefs.data, now) and self.delivered_reminder_day != now.date():
+            self.deliver_reminder(now)
         self.root.after(15000, self.tick)
+
+    def test_reminder(self):
+        return self.deliver_reminder(datetime.now(), test=True)
+
+    def deliver_reminder(self, now, test=False):
+        # Do not fight a date picker or modal dialog. The next timer tick retries.
+        if self.prefs.data.get("reminder_popup", True) and self.root.grab_current() is not None:
+            return False
+        try:
+            if self.prefs.data.get("reminder_popup", True):
+                if self.reminder_popup and self.reminder_popup.winfo_exists():
+                    self.reminder_popup.lift()
+                else:
+                    self.reminder_popup = ReminderPopup(self)
+            self.tray.notify()
+            if not test:
+                self.delivered_reminder_day = now.date()
+                self.prefs.save(last_reminded=now.date().isoformat())
+            return True
+        except (OSError, tk.TclError):
+            self.status.set("Could not complete the reminder. Check local settings and try Test reminder.")
+            return False
 
     def quit(self):
         if self.busy:

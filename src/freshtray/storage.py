@@ -61,8 +61,8 @@ class Vault:
             self.data = changed
 
 
-DEFAULTS = {"reminders": True, "time": "17:00", "weekdays_only": True,
-            "last_reminded": "", "business_id": None, "always_on_top": False, "docked_mode": False, "close_to_tray": True, "theme": "system", "window_size": None, "layout_revision": 0}
+DEFAULTS = {"reminders": True, "reminder_popup": True, "time": "17:00", "weekdays_only": True,
+            "last_reminded": "", "business_id": None, "always_on_top": False, "docked_mode": False, "close_to_tray": True, "theme": "system", "window_size": None, "layout_revision": 0, "dropdown_sort": "alphabetical", "reminder_position": None, "remind_me_minutes": 15, "reminder_again_at": None, "popup_sound": True, "popup_sound_choice": "ethereal", "remind_me_sound_choice": "ethereal", "popup_volume": 60}
 
 
 class Preferences:
@@ -70,7 +70,10 @@ class Preferences:
         self.path = Path(path)
         self.data = dict(DEFAULTS)
         if self.path.exists():
-            self.data.update(json.loads(self.path.read_text(encoding="utf-8")))
+            stored = json.loads(self.path.read_text(encoding="utf-8"))
+            self.data.update(stored)
+            if "remind_me_sound_choice" not in stored:
+                self.data["remind_me_sound_choice"] = self.data["popup_sound_choice"]
 
     def save(self, **values):
         updated = dict(self.data, **values)

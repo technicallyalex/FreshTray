@@ -43,7 +43,7 @@ python scripts/package-release.py
 ```
 
 The packaged check launches and closes only its own offline preview, storing its temporary profile in `.build/`.
-The release ZIP contains the ready-built app, source, tests, docs, scripts and root launchers. It excludes `.build/`, `archive/`, caches and local profiles.
+The published v0.1 portable ZIP contains the ready-built app, docs and root launchers. Source, tests and scripts are available separately in this repository. The current `package-release.py` helper instead attempts a combined app-and-source archive and still asserts that the absent `docs/USER_GUIDE.md` exists; correct that stale assertion before reusing the helper. Its current state is not a reproducible recipe for the published portable ZIP.
 
 ## Source map
 
@@ -61,4 +61,4 @@ The release ZIP contains the ready-built app, source, tests, docs, scripts and r
 | `freshtray/model.py` | Validation, date conversion and reminder decisions |
 | `freshtray/demo.py` | Isolated offline sample backend |
 
-Historical build scripts and snapshots under `archive/development-history/` retain their old paths for reference. Use the maintained tools under `scripts/` for current work.
+See [third-party notices and provenance limits](THIRD_PARTY_NOTICES.md) before preparing a distribution. Retain the application license, font license, and exact runtime component notices.

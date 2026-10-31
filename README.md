@@ -33,8 +33,12 @@ Credentials and tokens are encrypted for your Windows account. See [privacy/secu
 
 See [development instructions](docs/DEVELOPING.md). Source is in `src/`; tests in `tests/`; build tools in `scripts/`. Release binaries are attached to Releases rather than committed to Git.
 
-MIT licensed. Third-party fonts retain their own [license](src/assets/fonts/OFL-IBM-Plex.txt).
+The application code is [MIT licensed](LICENSE). Preserve its copyright and permission notice when redistributing copies or substantial portions. Bundled fonts, Python/runtime components and PyInstaller-related files retain their own terms; see [third-party notices and release limits](docs/THIRD_PARTY_NOTICES.md).
 
 ## AI disclosure
 
-FreshTray was created with the assistance of AI tools for code generation, debugging, documentation, and UI development.
+FreshTray was created with AI assistance for code generation, debugging, documentation, and UI development, as recorded in the original README and release notes. The maintainer confirmed on 2026-10-31 that ChatGPT was used. The records do not map each task to a particular tool or model, identify every affected file, or quantify the proportion of AI-generated material. Additional historical tools, if any, remain unverified.
+
+OpenAI Codex was used for the 2026-10-31 repository audit and to draft these disclosure and licensing documentation changes. This describes this audit only and does not establish earlier Codex use.
+
+AI assistance does not change the project's license or establish rights in third-party code or assets.

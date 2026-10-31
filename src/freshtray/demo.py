@@ -55,6 +55,15 @@ class Demo:
         self.entries[int(entry_id)].update(deepcopy(payload["time_entry"]))
         return self.get_entry(business, entry_id)
 
+    def delete_entry(self, business, entry_id, original, identity):
+        current = self.get_entry(business, entry_id)
+        if str(current.get('identity_id')) != str(identity) or entry_signature(current) != entry_signature(original):
+            raise ApiError('This entry changed elsewhere. Reload it before deleting.')
+        if edit_restriction(current):
+            raise ApiError(edit_restriction(current))
+        self.entries[int(entry_id)]['active'] = False
+        return {'deleted': True, 'id': int(entry_id), 'business_id': int(business)}
+
     def check_pending(self):
         return None
 

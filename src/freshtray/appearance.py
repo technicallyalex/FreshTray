@@ -5,20 +5,21 @@ import tkinter as tk
 from tkinter import ttk, font
 import winreg
 from .fonts import application_fonts
+from .refined_theme import apply_refinement
 
 # Light colors are from FreshBooks' public mui app stylesheet (2026-10-28).
 # Dark values are a contrast-preserving desktop adaptation of that palette.
 PALETTES = {
-    "light": {"bg": "#FFFEFD", "panel": "#FFFFFF", "field": "#FFFFFF", "ink": "#001B40",
-              "muted": "#576981", "border": "#CCD1D9", "hover": "#EEF6FC", "accent": "#038A06",
+    "light": {"bg": "#F7F9FC", "panel": "#FFFFFF", "field": "#FFFFFF", "ink": "#001B40",
+              "muted": "#576981", "border": "#D6DCE5", "hover": "#EEF6FC", "accent": "#038A06",
               "accent_hover": "#027505", "accent_text": "#FFFFFF", "selection": "#E2F0FB", "disabled": "#7F8C9F",
-              "subtle": "#F2F3F5", "warning": "#946400", "blue": "#0075DD", "header": "#002D79",
-              "header_text": "#FFFFFF", "header_muted": "#D2E9FB", "scroll_thumb": "#B8C1CD", "scroll_hover": "#7F8C9F"},
+              "subtle": "#F2F3F5", "warning": "#946400", "blue": "#0075DD", "header": "#FFFFFF",
+              "header_text": "#001B40", "header_muted": "#576981", "scroll_thumb": "#B8C1CD", "scroll_hover": "#7F8C9F"},
     "dark": {"bg": "#101B2A", "panel": "#17273B", "field": "#122237", "ink": "#EEF6FC",
              "muted": "#AAB9CB", "border": "#3D5069", "hover": "#233C58", "accent": "#4CC66A",
              "accent_hover": "#70D789", "accent_text": "#001B40", "selection": "#153D60", "disabled": "#8293AB",
-             "subtle": "#1C2E43", "warning": "#FFC414", "blue": "#64B5F6", "header": "#002D79",
-             "header_text": "#FFFFFF", "header_muted": "#D2E9FB", "scroll_thumb": "#52647D", "scroll_hover": "#7F8C9F"},
+             "subtle": "#1C2E43", "warning": "#FFC414", "blue": "#64B5F6", "header": "#17273B",
+             "header_text": "#EEF6FC", "header_muted": "#AAB9CB", "scroll_thumb": "#52647D", "scroll_hover": "#7F8C9F"},
 }
 
 
@@ -46,7 +47,10 @@ class Appearance:
     def apply(self, mode=None):
         if mode is not None:
             self.mode = mode
-        self.current = resolved_theme(self.mode)
+        target = resolved_theme(self.mode)
+        if target == self.current and hasattr(self, "palette"):
+            return
+        self.current = target
         p, s = PALETTES[self.current], self.style
         self.palette = p
         s.configure(".", font="AppBody", background=p["bg"], foreground=p["ink"], bordercolor=p["border"],
@@ -64,7 +68,7 @@ class Appearance:
         s.configure("CardMuted.TLabel", background=p["panel"], foreground=p["muted"], font="AppSmall")
         s.configure("Title.TLabel", font="AppTitle")
         s.configure("Section.TLabel", background=p["panel"], font="AppSection")
-        s.configure("Brand.TLabel", background=p["header"], foreground=p["header_text"], font="AppBrand")
+        s.configure("Brand.TLabel", background=p["header"], foreground=p["blue"], font="AppBrand")
         s.configure("Warning.TLabel", foreground=p["warning"])
         s.configure("TButton", background=p["panel"], foreground=p["ink"], padding=(10, 5), borderwidth=1, relief="flat",
                     focuscolor=p["blue"], font="AppButton", anchor="center")
@@ -118,6 +122,7 @@ class Appearance:
                         bordercolor=p["panel"], lightcolor=p["scroll_thumb"], darkcolor=p["scroll_thumb"],
                         borderwidth=0, relief="flat", width=9, arrowsize=0)
             s.map(name, background=[("active", p["scroll_hover"])])
+        apply_refinement(self)
         self.repaint()
         self.root.event_generate("<<AppearanceChanged>>", when="tail")
 

@@ -3,8 +3,7 @@ __pycache__/
 .build/
 app/
 archive/
-releases/*.zip
-releases/*.sha256.txt
+releases/
 *.dpapi
 *.dpapi.tmp
 settings.json

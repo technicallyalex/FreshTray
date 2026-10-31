@@ -31,6 +31,7 @@ class NoRedirect(HTTPRedirectHandler):
 class Transport:
     def __init__(self):
         self.opener = build_opener(NoRedirect())
+        self.timeout = 25
 
     def __call__(self, method, path, body=None, token=None):
         headers = {"Accept": "application/json", "User-Agent": "FreshTray/" + __version__}
@@ -42,7 +43,7 @@ class Transport:
             data = json.dumps(body).encode("utf-8")
         try:
             request = Request(API + path, data=data, headers=headers, method=method)
-            with self.opener.open(request, timeout=25) as response:
+            with self.opener.open(request, timeout=self.timeout) as response:
                 raw = response.read(8 * 1024 * 1024)
                 return json.loads(raw) if raw else {}
         except HTTPError as exc:
@@ -251,11 +252,58 @@ class FreshBooks:
             return entry
 
 
+    def delete_entry(self, business_id, entry_id, original, identity_id):
+        from .history_model import entry_signature, edit_restriction
+        with self.lock:
+            if self.vault.get("pending"):
+                raise ApiError("A previous operation needs checking. Use Check pending first.")
+            if str(original.get("id")) != str(entry_id):
+                raise ApiError("The selected entry does not match the deletion request.")
+            current = self.get_entry(business_id, entry_id)
+            if str(current.get("id")) != str(entry_id) or str(current.get("identity_id")) != str(identity_id):
+                raise ApiError("Only your own matching time entry can be deleted.")
+            if entry_signature(current) != entry_signature(original):
+                raise ApiError("This entry changed in FreshBooks. Reload it before deleting.")
+            restriction = edit_restriction(current)
+            if restriction:
+                raise ApiError(restriction)
+            token = self._token()
+            self.vault.update(pending={"operation": "delete", "business_id": int(business_id),
+                                      "entry_id": int(entry_id), "payload": {"time_entry": current}})
+            try:
+                self.transport("DELETE", f"/timetracking/business/{int(business_id)}/time_entries/{int(entry_id)}", token=token)
+            except ApiError as exc:
+                if not exc.uncertain:
+                    self.vault.update(pending=None)
+                raise
+            self._finish_delete(entry_id)
+            return {"deleted": True, "id": int(entry_id), "business_id": int(business_id)}
+
+    def _finish_delete(self, entry_id):
+        previous = self.vault.get("last_success") or {}
+        if str(previous.get("id")) == str(entry_id):
+            self.vault.update(pending=None, last_success=None)
+        else:
+            self.vault.update(pending=None)
+
     def check_pending(self):
         with self.lock:
             pending = self.vault.get("pending")
             if not pending:
                 return None
+            if pending.get("operation") == "delete":
+                try:
+                    entry = self.get_entry(pending["business_id"], pending["entry_id"])
+                except ApiError as exc:
+                    if exc.status != 404:
+                        raise
+                    entry = None
+                if entry is not None and str(entry.get("id")) != str(pending["entry_id"]):
+                    raise ApiError("FreshBooks returned an unexpected entry. The pending operation is retained.")
+                if entry is None or not entry.get("active", True):
+                    self._finish_delete(pending["entry_id"])
+                    return {"deleted": True, "id": pending["entry_id"], "business_id": pending["business_id"]}
+                return {"unresolved": True, "matches": 0}
             expected = pending["payload"]["time_entry"]
             if pending.get("operation") == "update":
                 entry = self.get_entry(pending["business_id"], pending["entry_id"])

@@ -24,7 +24,7 @@ def build_shell(app):
     header.columnconfigure(1, weight=1)
     ttk.Label(header, text="FreshTray", style="Brand.TLabel").grid(row=0, column=0, sticky="w")
     app.connection_text = tk.StringVar(value="FreshBooks time tracking")
-    nav = ttk.Frame(root, padding=(14, 5))
+    nav = ttk.Frame(root, style="Navigation.TFrame", padding=(14, 6))
     nav.grid(row=1, column=0, sticky="ew")
     for key, title, command in [("entry", "Log time", app.show_entry), ("history", "Monthly hours", app.open_history),
                                 ("settings", "Settings", app.settings)]:
@@ -48,7 +48,6 @@ def build_shell(app):
     app.settings_window = SettingsPanel(app, app.pages["settings"].body)
     app.settings_window.pack(fill="both", expand=True)
     app.status = tk.StringVar(value="Loading…")
-    WrapLabel(app.pages["entry"].body, textvariable=app.status, style="Muted.TLabel").pack(fill="x", pady=(4, 0))
     app.chrome = WindowChrome(app, header)
     app.select_page("entry")
     root.bind("<MouseWheel>", app.scroll_page, add="+")
@@ -116,10 +115,6 @@ def build_entry(app, parent):
     app.billable_check.pack(side="left")
     app.save_button = app.button(app.footer, "Preview entry" if app.demo else "Log time  ✓", app.submit, True)
     app.save_button.pack(side="right")
-    tools = ttk.Frame(parent)
-    tools.pack(fill="x", pady=(0, 4))
-    app.button(tools, "Reload clients & projects", app.load_profile).pack(side="left")
-    app.button(tools, "Check pending save", app.check_pending).pack(side="left", padx=8)
     app.form_controls = [app.business_combo, app.client_combo, app.project_combo, app.service_combo,
                          app.date_entry, app.hours_entry, app.note, app.billable_check]
 
@@ -138,6 +133,7 @@ class SettingsPanel(ttk.Frame):
         self.theme_choice.pack(anchor="w")
         self.theme_choice.bind("<<ComboboxSelected>>", self.change_theme)
         general = card(self, "Reminders & window", "Reminders use this computer's local time. Save settings to apply the options below.")
+        self.popup_reminder = tk.BooleanVar(value=app.prefs.data.get("reminder_popup", True))
         self.reminders = tk.BooleanVar(value=app.prefs.data["reminders"])
         self.weekdays = tk.BooleanVar(value=app.prefs.data["weekdays_only"])
         self.startup = tk.BooleanVar(value=startup_enabled() if not app.demo else False)
@@ -149,6 +145,7 @@ class SettingsPanel(ttk.Frame):
         ttk.Checkbutton(row, text="Daily reminder at", variable=self.reminders).pack(side="left")
         app.reminder_time = ReminderTime(row, app.prefs.data["time"])
         app.reminder_time.pack(side="left", padx=12)
+        ttk.Checkbutton(general, text="Show reminder popup", variable=self.popup_reminder).pack(anchor="w")
         ttk.Checkbutton(general, text="Weekdays only", variable=self.weekdays).pack(anchor="w")
         ttk.Checkbutton(general, text="Start when I sign in to Windows", variable=self.startup,
                         state="disabled" if app.demo else "normal").pack(anchor="w")
@@ -159,7 +156,7 @@ class SettingsPanel(ttk.Frame):
         buttons.pack(fill="x", pady=(8, 0))
         self.save_button = app.button(buttons, "Save settings", self.save, True)
         self.save_button.pack(side="left")
-        app.button(buttons, "Test notification", lambda: app.tray.notify()).pack(side="left", padx=8)
+        app.button(buttons, "Test reminder", app.test_reminder).pack(side="left", padx=8)
         connection = card(self, "FreshBooks connection")
         WrapLabel(connection, textvariable=app.connection_text, style="CardMuted.TLabel").pack(fill="x", pady=(0, 5))
         self.connection_button = app.button(connection, "Show connection setup", self.toggle_connection)
@@ -190,7 +187,11 @@ class SettingsPanel(ttk.Frame):
         buttons = ttk.Frame(connection, style="CardBody.TFrame")
         buttons.pack(fill="x", pady=(5, 0))
         app.button(buttons, "Disconnect", self.disconnect).pack(side="left")
-        app.button(buttons, "Release pending save…", self.release).pack(side="left", padx=8)
+        app.button(buttons, "Check pending save", app.check_pending).pack(side="left", padx=8)
+        recovery = ttk.Frame(connection, style="CardBody.TFrame")
+        recovery.pack(fill="x", pady=(8, 0))
+        app.button(recovery, "Reload clients & projects", app.load_profile).pack(side="left")
+        app.button(recovery, "Release pending save…", self.release).pack(side="left", padx=8)
 
     def toggle_connection(self):
         self.show_connection(not self.connection_expanded)
@@ -222,10 +223,11 @@ class SettingsPanel(ttk.Frame):
         try:
             if not app.demo:
                 set_startup(self.startup.get(), app.launcher)
-            app.prefs.save(reminders=self.reminders.get(), time=scheduled, weekdays_only=self.weekdays.get(), always_on_top=self.always_on_top.get(), docked_mode=self.docked_mode.get(), close_to_tray=self.close_to_tray.get())
+            app.prefs.save(reminders=self.reminders.get(), reminder_popup=self.popup_reminder.get(), time=scheduled, weekdays_only=self.weekdays.get(), always_on_top=self.always_on_top.get(), docked_mode=self.docked_mode.get(), close_to_tray=self.close_to_tray.get())
             app.docking.apply()
             app.apply_topmost()
             app.status.set("Settings saved. Reminder is scheduled in local time.")
+            app.feedback.show("Settings saved")
         except OSError:
             messagebox.showerror("Settings", "Windows could not save settings or startup registration.", parent=app.root)
 

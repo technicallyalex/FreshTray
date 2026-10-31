@@ -1,5 +1,32 @@
 # Third-party notices and licensing
 
+## FreshTray 0.2 runtime
+
+The application code is [MIT licensed](../LICENSE). Preserve its copyright and permission notice when redistributing copies or substantial portions. Dependencies and bundled assets retain their own licenses.
+
+- IBM Plex Sans: SIL Open Font License, in `src/assets/fonts/OFL-IBM-Plex.txt` and the extracted runtime assets. Retain the font notices and reserved-name conditions.
+- Python and incorporated runtime libraries: [Python distribution license and incorporated notices](licenses/Python.txt). Native runtime components retain their own terms; the MIT license does not replace them.
+- PyInstaller: [COPYING and bootloader exception](licenses/PyInstaller-COPYING.txt). This is a build tool, not a service connection.
+- The blue clock icon and reminder sounds have editable generators in `scripts/make-icon.py` and `scripts/make-reminder-sound.py`. No external stock icon or sound file is used by those generators.
+- FreshBooks is an external service and trademark. This independent app is not affiliated with or endorsed by FreshBooks. No proprietary FreshBooks font or logo file is redistributed.
+
+### Qt / PySide
+
+
+Qt / PySide6 / Shiboken 6.11.2 use Qt Company's open-source LGPLv3 option. The single-file executable extracts dynamically loaded Qt DLLs into a temporary runtime directory; Qt sources were not modified. To use modified compatible libraries, replace the corresponding libraries in the build environment and rebuild using the editable source and scripts described in DEVELOPING.md. Bundled license texts are extracted with the runtime under `notices`. LGPLv3 and GPLv3 texts accompany this source in docs/licenses. The app's MIT license does not change the runtime license. Users may replace compatible Qt libraries and debug modifications to those libraries.
+
+- Licensing: https://doc.qt.io/qt-6/licensing.html
+- Qt source: https://code.qt.io/cgit/qt/qtbase.git/?h=v6.11.2 and https://code.qt.io/cgit/qt/qtdeclarative.git/?h=v6.11.2
+- PySide/Shiboken source: https://code.qt.io/cgit/pyside/pyside-setup.git/?h=v6.11.2
+
+Runtime versions are pinned in requirements.txt. The active Qt bundle does not use Tcl/Tk; the Tk implementation remains available as legacy source.
+
+
+## Historical 0.1 licensing audit
+
+The following audit is retained from the public 0.1 branch. Its inventory and observations describe 0.1, not the rebuilt Qt-based 0.2 executable.
+
+
 Reviewed against main at `b7f2e44f76bec9af32062b2f19e3c501697c3b8f` on 2026-10-31.
 
 ## Application code

@@ -42,6 +42,7 @@ class LaunchFit:
     def __init__(self, app):
         self.app = app
         self.pending, self.is_ready, self.job = True, False, None
+        self.sizes = {}
 
     def ready(self):
         self.is_ready = True
@@ -53,57 +54,50 @@ class LaunchFit:
 
     def fit(self):
         self.job = None
-        app, root = self.app, self.app.root
-        if not self.pending or root.state() != 'normal':
-            return
-        self.pending = False
-        # Build the history layout for measurement without fetching any time entries.
-        if app.businesses and app.profile_data and app.history_window is None:
-            from .history import MonthlyView
-            app.history_window = MonthlyView(app, app.selected_business(), app.profile_data)
-            app.history_window.pack(fill='both', expand=True)
-            app.history_window.status.set('Open Monthly hours to load logged time.')
-            app.appearance.repaint()
-        selected, focus = app.active_page, root.focus_get()
-        left, top, right, bottom = work_area(root)
-        chrome = frame_size(root)
-        available = right-left, bottom-top
-        width = max(760, app.pages[selected].min_width + 16)
-        if selected == 'history' and app.history_window is not None:
-            tree = app.history_window.tree
-            width = max(width, app.history_window.preferred_table_width + 64)
-        width, _ = fitted_size((width, 760), available, chrome)
-        root.geometry(f'{width}x{root.winfo_height()}')
-        height = 0
-        try:
-            # Two passes settle wrapping and responsive columns at the final width.
-            for _ in range(3):
-                for name, page in [(selected, app.pages[selected])]:
-                    app.page_host.select(page)
-                    page.activate()
-                    root.update_idletasks()
-                    measured_width = max(width, page.min_width + 16)
-                    measured_width, _ = fitted_size((measured_width, 760), available, chrome)
-                    if measured_width != width:
-                        width = measured_width
-                        root.geometry(f'{width}x{root.winfo_height()}')
-                        root.update_idletasks()
-                    needed = page.body.winfo_reqheight()
-                    if name == 'history' and app.history_window is not None:
-                        history = app.history_window
-                        weeks = len(calendar.Calendar(6).monthdayscalendar(history.month.year, history.month.month))
-                        # Reserve six rows so changing months doesn't clip the details.
-                        needed += (6-weeks) * (app.appearance.line_height*2+12)
-                    height = max(height, needed)
-            height += sum(band.winfo_reqheight() for band in app.shell_bands) + 12
-            width, height = fitted_size((width, height), available, chrome)
-            x = left + max(0, (right-left-width-chrome[0])//2)
-            y = top + max(0, (bottom-top-height-chrome[1])//2)
-            root.geometry(f'{width}x{height}{x:+d}{y:+d}')
-            if app.prefs.data.get("docked_mode"):
-                root.after_idle(app.docking.position)
-        finally:
-            app.page_host.select(app.pages[selected])
-            app.refresh_pages()
-            if focus is not None and focus.winfo_exists():
-                focus.focus_set()
+        app,root = self.app,self.app.root
+        if not self.pending or root.state()!='normal':return
+        self.pending=False
+        selected=app.active_page
+        if selected=="history" and app.history_window is None:return
+        left,top,right,bottom=work_area(root)
+        chrome=frame_size(root);available=(right-left,bottom-top)
+        key=(selected,app.appearance.current,float(root.tk.call('tk','scaling')),bool(app.editing_entry),app.settings_window.connection_expanded,app.prefs.data.get("business_id"),available)
+        def commit(width,height):
+            width,height=fitted_size((width,height),available,chrome)
+            x=max(left,min(root.winfo_x(),right-width-chrome[0]))
+            y=max(top,min(root.winfo_y(),bottom-height-chrome[1]))
+            if app.prefs.data.get('docked_mode'):
+                x=max(left,right-width-chrome[0]-12);y=max(top,bottom-height-chrome[1]-12)
+            self.sizes[key]=(width,height)
+            app.pages[selected].viewport.measure_width = None
+            app.transition.resize(width,height,x,y)
+            app.pages[selected].activate()
+        cached=self.sizes.get(key)
+        if cached:
+            commit(*cached);return
+        width=max(760,app.pages[selected].min_width+16)
+        if selected=='history' and app.history_window is not None:
+            width=max(width,app.history_window.preferred_table_width+64)
+        width,_=fitted_size((width,760),available,chrome)
+        app.pages[selected].viewport.measure_width = width
+        app.pages[selected].viewport.schedule()
+        # Let Tk lay out naturally; never pump a nested idle/event loop during resize.
+        def measure(attempt=0):
+            if not root.winfo_exists():return
+            if app.active_page!=selected:
+                app.pages[selected].viewport.measure_width=None
+                app.pages[selected].sync()
+                return
+            page=app.pages[selected]
+            measured,_=fitted_size((max(width,page.min_width+16),760),available,chrome)
+            if abs(page.body.winfo_width()-measured)>20 and attempt<2:
+                page.viewport.measure_width=measured
+                page.viewport.schedule()
+                root.after(16,lambda:measure(attempt+1));return
+            height=page.body.winfo_reqheight()+sum(b.winfo_reqheight() for b in app.shell_bands)+12
+            if selected=='history' and app.history_window is not None:
+                h=app.history_window
+                weeks=len(calendar.Calendar(6).monthdayscalendar(h.month.year,h.month.month))
+                height+=(6-weeks)*(app.appearance.line_height*2+12)
+            commit(measured,height)
+        root.after(16,measure)

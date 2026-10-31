@@ -6,6 +6,7 @@ class Viewport(tk.Frame):
     def __init__(self, parent, min_width=500):
         super().__init__(parent, width=1, height=1, borderwidth=0, highlightthickness=0)
         self.min_width = min_width
+        self.measure_width = None
         self.content = None
         self.offset_x = self.offset_y = 0
         self.content_width = self.content_height = 1
@@ -39,7 +40,7 @@ class Viewport(tk.Frame):
         if self.content is None or not self.content.winfo_exists():
             return
         width, height = max(1, self.winfo_width()), max(1, self.winfo_height())
-        self.content_width = max(self.min_width, width)
+        self.content_width = self.measure_width or max(self.min_width, width)
         self.content_height = max(1, self.content.winfo_reqheight())
         self.offset_x = min(max(0, self.offset_x), max(0, self.content_width - width))
         self.offset_y = min(max(0, self.offset_y), max(0, self.content_height - height))

@@ -25,7 +25,7 @@ A dedicated popup opens independently of Windows notification banners. It includ
 
 Finish syncing pending changes, quit the previous tray copy, then run **FreshTray-0.2.exe**. Your profile stays in `%LOCALAPPDATA%/FreshTray`. If the EXE moved, update the startup option from its new location. Do not downgrade while local changes are waiting to sync.
 
-This PR prepares 0.2 for review; it does not publish the release or replace the existing 0.1 download.
+Download the portable executable and documentation bundle from the [0.2 release](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2).
 
 # FreshTray 0.1
 

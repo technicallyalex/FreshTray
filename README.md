@@ -14,11 +14,9 @@ The popup is an app window, separate from Windows notification banners. It can s
 
 ## Get started
 
-**0.2 is awaiting review.** Its download will be added after approval. The [currently published release](https://github.com/technicallyalex/FreshTray/releases) remains 0.1 until then.
+Download [FreshTray 0.2](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2):
 
-For the prepared 0.2 build:
-
-1. Download **FreshTray-0.2.exe** from the 0.2 release's Assets when available.
+1. Download **FreshTray-0.2.exe** from the release's Assets.
 2. Keep it in a permanent folder and double-click it. No installer, Python or companion runtime folder is needed.
 3. Open **Settings > FreshBooks connection** and follow the [setup guide](docs/SETUP.md). You need your own FreshBooks developer application; no shared credentials are included.
 4. Set a reminder time under **Settings > Preferences**, then use **Test reminder**.

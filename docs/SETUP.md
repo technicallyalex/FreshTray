@@ -2,7 +2,7 @@
 
 ## 1. Run FreshTray
 
-Download **FreshTray-0.2.exe** from the 0.2 release Assets when published, save it in a permanent folder, and double-click it. No installation or Python is required. For a local source build, use **Run FreshTray.cmd** after building.
+Download **FreshTray-0.2.exe** from the [0.2 release Assets](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2), save it in a permanent folder, and double-click it. No installation or Python is required. For a local source build, use **Run FreshTray.cmd** after building.
 
 Only one copy runs at a time. If nothing appears, check the hidden-icons arrow beside the Windows clock and click the blue FreshTray icon. Quit an older copy before starting an update.
 

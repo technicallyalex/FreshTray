@@ -1,37 +1,39 @@
-# FreshTray 0.2
+# FreshTray
 
-A complete overhaul of FreshTray, the Windows tray app for logging time to FreshBooks.
+FreshTray is an application for logging time with your FreshBooks account. Record your work, review your hours in a monthly calendar, and set reminders to keep your time entries up to date.
 
 ![FreshTray monthly calendar and entry form](docs/images/monthly-hours.png)
 
-## What's new
+## What you can do
 
-- **Rebuilt with Qt Quick.** A new PySide6 / QML interface with responsive layouts, display scaling and smoother panel transitions.
-- **A cleaner, cohesive design.** Folder-style tabs, rounded controls, light and dark themes, and a monthly calendar with time-entry editing built in.
-- **A better reminder popup.** An animated punchcard, draggable placement that is remembered, a Remind me timer, and separate sound choices for daily and follow-up reminders.
-
-The popup is an app window, separate from Windows notification banners. It can still open when Windows notifications are disabled or Do Not Disturb is on. FreshTray must be running, the popup enabled, and the desktop available. [Reminder details](docs/USAGE.md#reminders).
+- **Log your work:** choose a business, client, date, hours and note, with optional project, service and billable status.
+- **Manage your hours:** browse a monthly calendar, see weekly and monthly totals, and add, edit or delete entries for a selected day.
+- **Get reminders:** choose a daily reminder time, use the Remind me timer, and customize popup sounds and volume.
+- **Work offline:** add, edit and delete entries using downloaded account data, then sync your changes when the connection returns.
+- **Make it yours:** choose a light or dark theme, remember common selections, and sort choices alphabetically or by recent use.
 
 ## Get started
 
-Download [FreshTray 0.2](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2):
+1. Open the [latest release](https://github.com/technicallyalex/FreshTray/releases/latest) and download the FreshTray **.exe** under Assets. The ZIP includes the application with documentation and license notices.
+2. Keep the executable in a permanent folder and double-click it. No installer, Python or companion runtime folder is needed.
+3. Open **Settings > FreshBooks connection** and follow the [setup guide](docs/SETUP.md). You need a FreshBooks account and your own FreshBooks developer application; no shared credentials are included.
+4. Choose your business and client in **Log time**, enter your hours and note, then select **Log time**.
 
-1. Download **FreshTray-0.2.exe** from the release's Assets.
-2. Keep it in a permanent folder and double-click it. No installer, Python or companion runtime folder is needed.
-3. Open **Settings > FreshBooks connection** and follow the [setup guide](docs/SETUP.md). You need your own FreshBooks developer application; no shared credentials are included.
-4. Set a reminder time under **Settings > Preferences**, then use **Test reminder**.
+Requires Windows 10/11 x64. The executable is unsigned, so Windows may show a publisher warning. Settings and encrypted account data remain in your Windows profile rather than inside the EXE.
 
-Windows 10/11 x64 is required. The executable is unsigned, so Windows may show a publisher warning. Settings and encrypted account data remain in your Windows profile rather than inside the EXE.
+## Using FreshTray
 
-Upgrading? Finish syncing pending changes, quit the old copy from its tray menu, and open the new EXE. Existing account settings are reused. If you move the app, update **Start with Windows** from the new location.
+**Log time** provides a form for recording your work. **Monthly hours** lets you select a day and manage its entries directly beside the calendar. Common selections are remembered between sessions, and settings apply automatically.
 
-## Daily use
+Under **Settings > Preferences**, choose a reminder time and use **Test reminder** to preview it. The reminder popup works independently of Windows notification banners. FreshTray must be running with popups enabled and the desktop available. [More about reminders](docs/USAGE.md#reminders).
 
-Choose a business, client, date, hours and note in **Log time**, or select a day in **Monthly hours** to add, edit or delete an entry there. Common selections are remembered. Settings apply automatically.
+For offline work, connect and open the months you need before losing internet. Downloaded lists and entries are cached locally. Changes sync when the connection returns; conflicts or uncertain submissions are held for review rather than blindly retried.
 
-Downloaded account lists and calendar months are cached locally. Add, edit and delete entries offline; FreshTray syncs saved changes when the connection returns and asks for review if it detects a conflict or uncertain submission. Connect and open the months you need before going offline.
+See the [illustrated usage guide](docs/USAGE.md) for everyday controls and the [privacy/security details](docs/SECURITY.md) for storage and synchronization behavior.
 
-See the [illustrated usage guide](docs/USAGE.md), [release notes](docs/RELEASE_NOTES.md) and [privacy/security details](docs/SECURITY.md).
+## Updating
+
+Download the latest executable, finish syncing pending changes, and quit the previous copy before opening the new one. Existing account settings are reused. If you move the application, update **Start with Windows** from the new location. Read the [release notes](docs/RELEASE_NOTES.md) for changes between versions.
 
 ## Source and license
 

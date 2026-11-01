@@ -240,8 +240,16 @@ Item {
             }
 
             Item { Layout.fillWidth: true }
-
-
+            Check {
+                objectName: "automaticUpdates"; text: "Check updates on startup"
+                checked: backend.updater.state.autoCheck
+                onToggled: backend.updater.setAutoCheck(checked)
+            }
+            AppButton {
+                objectName: "checkUpdates"; text: "Check for updates"
+                enabled: backend.updater.state.phase!=="checking" && backend.updater.state.phase!=="downloading" && backend.updater.state.phase!=="preparing"
+                onClicked: backend.updater.checkUpdates()
+            }
 
         }
 

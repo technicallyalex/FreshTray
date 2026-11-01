@@ -27,6 +27,8 @@ from .alert_sound import PopupChime, SOUNDS, sound_settings
 from .reminder_delay import ReminderDelay, delay_minutes
 from .choice_history import ChoiceHistory
 from . import __version__
+from .qt_updates import UpdateManager
+from . import updates
 from .windows import startup_enabled, set_startup
 
 
@@ -50,6 +52,11 @@ class Controller(QObject):
 
     def __init__(self, api, vault, prefs, assets, launcher, demo=False, tray=True):
         super().__init__()
+        self._updater = UpdateManager(prefs,demo,self)
+        self._updater.installRequested.connect(self.install_downloaded_update)
+        self._updater.prepared.connect(self.restart_for_update)
+        self._updater.preparationFailed.connect(self.update_preparation_failed)
+        self._installing = False
         self.offline = None if demo else OfflineAPI(api, vault, Vault(vault.path.parent/'offline.dpapi'))
         if self.offline and hasattr(api.transport, 'timeout'):
             api.transport.timeout = 8
@@ -113,6 +120,10 @@ class Controller(QObject):
         self.sync_timer.timeout.connect(self.syncOffline)
         self.sync_timer.start(5000)
         self.rebuild_calendar()
+
+    @Property(QObject, constant=True)
+    def updater(self):
+        return self._updater
 
     @Property('QVariantMap', notify=changed)
     def state(self):
@@ -278,6 +289,7 @@ class Controller(QObject):
 
     @Slot()
     def start(self):
+        self._updater.start()
         if self.api.connected:
             self.load_profile()
 
@@ -954,7 +966,37 @@ class Controller(QObject):
         else:
             self.shutdown()
 
+    def install_downloaded_update(self):
+        if not self._updater.portable:
+            self._updater.install_error('Automatic installation is available in the portable executable.')
+            return
+        if self._s['busy'] or self.syncing or any(self.dirty(scope) for scope in self.forms):
+            self._updater.install_error('Save or discard entry drafts and wait for any current operation to finish before installing.')
+            return
+        self._installing=True
+        self._s.update(busy=True,loading='update')
+        self.sync_timer.stop();self.emit()
+        args=list(sys.argv[1:])
+        if '--update-receipt' in args:
+            offset=args.index('--update-receipt');del args[offset:offset+2]
+        self._updater.prepare(sys.executable,args)
+
+    def update_preparation_failed(self):
+        self._installing=False;self._s.update(busy=False,loading='')
+        self.sync_timer.start(5000);self.emit()
+
+    def restart_for_update(self,plan):
+        try:
+            self.prefs.save(update_plan=plan)
+            updates.spawn([str(Path(plan).parent/'update-helper.exe'),'--apply-update',plan])
+        except (OSError,ValueError):
+            self.update_preparation_failed()
+            self._updater.install_error('The updater could not start. Your current app is unchanged.')
+            return
+        self.shutdown()
+
     def shutdown(self):
+        self._updater.close()
         if self.offline:
             self.offline.stopping.set()
         self.popup_chime.close()

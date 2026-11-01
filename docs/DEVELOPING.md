@@ -64,3 +64,11 @@ Build and verify the EXE first, then run `./.venv/Scripts/python.exe scripts/pac
 For a native Windows popup pass, set `QT_QPA_PLATFORM=windows` and run `tests/smoke_popup_qt.py` in the project environment. It tests test/scheduled/follow-up popups with a notification adapter that silently suppresses or rejects banners. It does not change the user's Windows notification settings.
 
 See [third-party notices and provenance limits](THIRD_PARTY_NOTICES.md) before preparing a distribution. Retain the application license, font license, and exact runtime component notices.
+
+## Portable updater
+
+`updates.py` handles official release metadata, bounded HTTPS downloads, integrity checks and staged replacement; `qt_updates.py` runs discovery/download/preparation on a separate worker. `UpdateDialog.qml` displays plain-text release notes, progress and explicit download/install/dismiss actions. Source/demo modes do not perform startup checks or installation.
+
+The copied frozen EXE runs `--apply-update` before Qt and the single-instance guard initialize. It waits for the old GUI process, replaces the target in place, starts a new process with `PYINSTALLER_RESET_ENVIRONMENT=1`, and waits for a validated startup receipt. Failed startup restores the backup when possible. The helper never accesses a credential vault. `test_updates.py` and `smoke_updates_qt.py` exercise network validation, corrupt downloads, rollback and UI guards using fictional data. No test publishes a release.
+
+After building, run `./tests/check-update-packaged.ps1 -ExecutablePath .build/portable-0.2.1/FreshTray.exe`, then repeat with `-ExpectRollback`. These checks replace only a disposable app copy, use an isolated fictional profile and validate frozen helper restart/acknowledgement and rollback. They never update the user's working executable or contact FreshBooks. Close any existing developer preview first.

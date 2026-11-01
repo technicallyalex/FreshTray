@@ -52,3 +52,15 @@ Connect once and open the months you want available before losing internet. Acco
 If you edit then delete an unsynced new entry, its addition is canceled locally. FreshTray checks for changes made elsewhere before updating or deleting. Conflicts and submissions whose outcome is uncertain remain under **Settings > FreshBooks connection** for review. Check FreshBooks before discarding an uncertain local change; it may already exist there. Ambiguous additions are not blindly replayed.
 
 An undownloaded month is marked incomplete. Keep the app running to finish sync, and resolve pending changes before disconnecting, deleting profile files or downgrading. **Disconnect** removes local account credentials and downloaded data after successful disconnection; it does not delete entries already saved in FreshBooks.
+
+## Application updates
+
+Use **Settings > Preferences > Check for updates** to see the latest official release and its patch notes. Startup checks are enabled by default for the portable app and run at most once a day; switch off **Check updates on startup** to check only when you choose.
+
+Choose **Download update**, then **Install and restart** after verification finishes. Save or discard unfinished entry drafts first and wait for any active operation. FreshTray replaces the portable EXE at its existing location, keeping account settings and encrypted offline changes in your Windows profile. It does not require administrator access; if its folder is not writable, move the app to a folder you control or update manually.
+
+**Dismiss** skips the current version's automatic prompt. You can still find it with Check for updates, and a newer version can prompt again. Cancel download stops the download without changing your app.
+
+Downloads come only from the official FreshTray GitHub release. The app verifies the published SHA-256 checksum and GitHub asset digest when available, then checks the Windows executable format. This is an integrity check, not a code-signing guarantee. A temporary helper keeps the previous EXE until the new app confirms startup; a failed start triggers rollback, with a `.previous-…exe` backup retained if Windows prevents restoration. User data is not replaced.
+
+Version 0.2 predates this updater and needs a manual upgrade once. Source/developer previews never install updates automatically. Updater checks do not send FreshBooks credentials or account data to GitHub.

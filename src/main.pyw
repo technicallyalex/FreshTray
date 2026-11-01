@@ -4,6 +4,14 @@ import os
 from pathlib import Path
 import sys
 
+# The copied helper must run without initializing Qt or the single-instance guard.
+if __name__ == '__main__' and len(sys.argv)==3 and sys.argv[1]=='--apply-update':
+    from freshtray.updates import apply_plan
+    try:
+        sys.exit(0 if apply_plan(sys.argv[2]) else 1)
+    except Exception:
+        sys.exit(1)
+
 from PySide6.QtCore import QUrl, QTimer, Qt, QCoreApplication, QEvent
 from PySide6.QtGui import QFontDatabase, QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox
@@ -22,6 +30,7 @@ def main():
     parser.add_argument('--demo', action='store_true')
     parser.add_argument('--background', action='store_true')
     parser.add_argument('--data-dir', type=Path)
+    parser.add_argument('--update-receipt', type=Path, help=argparse.SUPPRESS)
     args = parser.parse_args()
     # Qt 6 owns per-monitor DPI awareness. Do not set Tk/Win32 scaling overrides.
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
@@ -55,7 +64,14 @@ def main():
         if not args.background:
             controller.window.show()
         QTimer.singleShot(0, controller.start)
+        if args.update_receipt:
+            from freshtray.updates import mark_ready
+            def acknowledge_update():
+                try:mark_ready(args.update_receipt,sys.executable)
+                except (OSError,ValueError):application.exit(1)
+            QTimer.singleShot(1200,acknowledge_update)
         result = application.exec()
+        controller._updater.close()
         controller.popup_chime.close()
         engine.deleteLater()
         QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
@@ -65,6 +81,7 @@ def main():
     except Exception:
         QMessageBox.critical(None, 'FreshTray could not start', 'Try a fresh copy of the executable and check that this Windows account can open its encrypted settings. Your existing account data has not been removed.')
         if controller:
+            controller._updater.close()
             controller.popup_chime.close()
             controller.local_executor.shutdown(wait=False, cancel_futures=True)
             controller.executor.shutdown(wait=False, cancel_futures=True)

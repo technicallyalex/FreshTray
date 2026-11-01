@@ -21,3 +21,11 @@ Each user supplies their own developer app credentials. This is not a hosted mul
 Disconnect revokes the refresh token before removing local credentials. If it fails, retry or revoke the integration in FreshBooks. To erase local data, quit first, then remove the FreshTray folder in LOCALAPPDATA. This also removes encrypted recovery records; sync or resolve all queued changes first. Deleting offline.dpapi removes unsynced time entries; do not downgrade while changes are pending.
 
 For a security concern, do not post secrets, private notes, customer identifiers or callback URLs in public issues. Use GitHub's private vulnerability reporting if enabled, or describe only non-sensitive reproduction steps.
+
+## Update checks and downloads
+
+The portable app can check the public GitHub releases API at startup (at most once per day) or on demand. This sends a standard HTTPS request with an updater user-agent; no FreshBooks token, account identifier, note or time entry is included. Disable startup checks in Preferences to use manual checks only.
+
+Only newer stable releases from `technicallyalex/FreshTray` are accepted. Redirects are restricted to GitHub's HTTPS download hosts. Downloads are bounded in size and duration, checked against their published SHA-256 file and GitHub asset digest if supplied, and validated as Windows x64 executables. These checks detect corruption and inconsistent assets; they do not protect against a compromised release publisher or replace executable signing.
+
+Update downloads and a temporary helper are stored under `%LOCALAPPDATA%/FreshTray/updates`. The helper replaces only the running portable app path and does not modify credentials or offline data. Installation is user-triggered and blocked during unfinished drafts or active save/sync operations. A backup is kept until startup acknowledgement; if Windows locks prevent rollback, the backup remains beside the EXE for recovery. There is no elevation request or unattended installation.

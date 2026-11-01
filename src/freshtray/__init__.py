@@ -1,2 +1,2 @@
 """FreshTray — a personal Windows FreshBooks time logger."""
-__version__ = "0.2"
+__version__ = "0.2.1"

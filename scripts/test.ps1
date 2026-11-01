@@ -16,6 +16,8 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Offline sync integration checks failed.' }
         & $pythonPath (Join-Path $projectPath 'tests\smoke_popup_qt.py')
         if ($LASTEXITCODE -ne 0) { throw 'Independent popup checks failed.' }
+        & $pythonPath (Join-Path $projectPath 'tests\smoke_updates_qt.py')
+        if ($LASTEXITCODE -ne 0) { throw 'Update UI integration checks failed.' }
         foreach ($scale in @('1','1.25','1.5','2')) {
             & $pythonPath (Join-Path $projectPath 'tests\qa_layout_qt.py') --scale $scale
             if ($LASTEXITCODE -ne 0) { throw "Layout QA failed at scale $scale." }

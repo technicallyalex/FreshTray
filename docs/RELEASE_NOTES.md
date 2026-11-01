@@ -1,3 +1,9 @@
+# FreshTray 0.2.1 — local testing build
+
+- Added in-app update checks, patch notes, download progress, dismissal and an explicit install/restart step.
+- Added optional daily startup checks, verified downloads and a portable replacement helper with startup acknowledgement and rollback.
+- Account settings and offline changes remain in the existing Windows profile. This build is local only; no release has been published.
+
 # FreshTray 0.2 — a complete overhaul
 
 FreshTray has been rebuilt around a new UI framework, with a more polished design and a richer reminder experience.

@@ -72,7 +72,7 @@ names={
  'log':['businessChoice','logClient','logDate','logHours','logSave'],
  'month-five':['monthlyCalendar','monthClient','monthDate','monthHours','monthSave','dayEntriesArea'],
  'month-six':['monthlyCalendar','monthClient','monthDate','monthHours','monthSave','dayEntriesArea'],
- 'preferences':['dropdownSorting','versionLink','remindMeDelay','popupSoundChoice','remindMeSoundChoice','popupVolume'],
+ 'preferences':['dropdownSorting','versionLink','remindMeDelay','popupSoundChoice','remindMeSoundChoice','popupVolume','automaticUpdates','checkUpdates'],
  'connection':['oauthClient','oauthSecret','oauthRedirect','oauthSignIn','refreshAccountData','disconnectAccount'],
  'return':['oauthReturned','oauthFinish','oauthBack','refreshAccountData','disconnectAccount'],
  'review':['syncReviewChoice','discardSyncChange','refreshAccountData','disconnectAccount'],

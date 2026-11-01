@@ -407,6 +407,15 @@ ApplicationWindow {
 
     }
 
+    UpdateDialog { id: updaterDialog; parent: Overlay.overlay }
+    Connections {
+        target: backend.updater
+        function onPrompt() {
+            if(!window.visible) window.show()
+            updaterDialog.open()
+        }
+    }
+
     Window {
         id: reminderWindow; objectName: "reminderWindow"
         width: 400; height: 390; visible: false

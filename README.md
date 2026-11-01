@@ -15,7 +15,7 @@ FreshTray is an application for logging time with your FreshBooks account. Recor
 ## Get started
 
 1. Open the [latest release](https://github.com/technicallyalex/FreshTray/releases/latest) and download the FreshTray **.exe** under Assets. The ZIP includes the application with documentation and license notices.
-2. Keep the executable in a permanent folder and double-click it. No installer, Python or companion runtime folder is needed.
+2. Keep the executable in a permanent folder and double-click it. FreshTray is a portable app that doesn't require installation.
 3. Open **Settings > FreshBooks connection** and follow the [setup guide](docs/SETUP.md). You need a FreshBooks account and your own FreshBooks developer application; no shared credentials are included.
 4. Choose your business and client in **Log time**, enter your hours and note, then select **Log time**.
 

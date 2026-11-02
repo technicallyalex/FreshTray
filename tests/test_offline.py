@@ -93,6 +93,27 @@ class OfflineTests(unittest.TestCase):
         self.assertEqual(len(self.server.rows), 1)
         self.assertEqual(self.api.status()['count'], 0)
         self.assertFalse(str(self.rows()[0]['id']).startswith('local-'))
+
+    def test_timer_submission_repeated_after_queue_and_sync_is_once(self):
+        request='ba744a99-0f27-47ba-967a-4d22083048d0'
+        self.network=False
+        first=self.api.submit_timer(1,self.payload,request)
+        self.api=self.reopen()
+        again=self.api.submit_timer(1,self.payload,request)
+        self.assertEqual(first['id'],again['id']);self.assertEqual(len(self.api.data['outbox']),1)
+        self.network=True;self.api.sync(force=True)
+        self.api=self.reopen()
+        self.assertEqual(self.api.timer_submission_state(request),'saved')
+        self.api.submit_timer(1,self.payload,request)
+        self.assertEqual(len(self.api.data['outbox']),0)
+        self.assertEqual(self.server.writes.count('POST'),1)
+
+    def test_timer_request_cannot_be_reused_for_changed_fields(self):
+        request='ba744a99-0f27-47ba-967a-4d22083048d0'
+        self.api.submit_timer(1,self.payload,request)
+        changed=deepcopy(self.payload);changed['time_entry']['duration']+=1
+        with self.assertRaises(ApiError):self.api.submit_timer(1,changed,request)
+        self.assertEqual(len(self.api.data['outbox']),1)
     def test_unsynced_edit_and_delete_cancel_without_network(self):
         self.network = False
         local = self.api.submit(1, self.payload)

@@ -4,7 +4,7 @@ FreshTray talks directly to FreshBooks over HTTPS. It has no analytics, hosted t
 
 Client secrets, tokens and pending-save recovery records are encrypted with Windows DPAPI CurrentUser in `%LOCALAPPDATA%/FreshTray/vault.dpapi`. Downloaded account lists, time-entry snapshots and queued offline changes are encrypted separately in `%LOCALAPPDATA%/FreshTray/offline.dpapi`. Ordinary preferences are stored beside it in `settings.json`. Preview mode has a separate FreshTray-Preview profile. The encrypted vault is tied to your Windows profile; another process running as you can still access your data.
 
-The app requests only the profile, client, project, service and time-entry scopes listed in SETUP.md. Pasted callback URLs are not saved. Network response bodies and credentials are not logged. In-memory forms disappear on quit.
+The app requests only the profile, client, project, service and time-entry scopes listed in SETUP.md. Pasted callback URLs are not saved. Network response bodies and credentials are not logged. Manual-entry drafts disappear on quit; the timer session and its draft are retained in the encrypted vault for recovery.
 
 Offline changes persist before the app reports a local save. Interrupted network writes retain an encrypted pending record; ambiguous creates pause for explicit review rather than automatic resubmission. Updates check the current record before writing, but this is not an atomic provider-side lock. Changes that have not been sent sync automatically after connectivity returns. Ambiguous creates are never automatically retried. Conflicting edits/deletions are retained for review. Account identity is verified before synchronization, and disconnect is blocked while local changes remain. Billed status is retained; related invoice records are not edited by this app.
 
@@ -12,7 +12,7 @@ Each user supplies their own developer app credentials. This is not a hosted mul
 
 ## Known limits
 
-- Unsigned portable Windows x64 build; no installer or automatic updates.
+- Unsigned portable Windows x64 build; no installer. In the 0.3 RC, update checks can be disabled and installation always requires an explicit action; prereleases are excluded from the stable update channel.
 - Live FreshBooks write acceptance, billing effects and account-specific permissions require user verification.
 - Historical native runtime crashes prompted window-handling changes; short regression tests cannot establish crash-free long-running operation.
 - Custom icon controls support keyboard activation/tooltips but have limited screen-reader semantics.

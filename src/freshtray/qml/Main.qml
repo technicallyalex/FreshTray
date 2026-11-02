@@ -36,7 +36,7 @@ ApplicationWindow {
 
     property var bounds: ({x:0,y:0,width:1200,height:800})
 
-    minimumWidth: Math.min(page==="month" ? 778 : 540,bounds.width)
+    minimumWidth: Math.min(page==="month" ? 778 : page==="timer" ? 650 : 540,bounds.width)
 
     minimumHeight: Math.min(page==="month" ? (width<778 ? 780 : 490) : 490,bounds.height)
 
@@ -56,9 +56,9 @@ ApplicationWindow {
 
         resizeGuard.restart()
 
-        let w=keepWidth ? width : page==="month" ? 1040 : page==="settings" ? 720 : 620
+        let w=keepWidth ? width : page==="month" ? 1040 : page==="timer" ? 780 : page==="settings" ? 720 : 620
 
-        let h=page==="month" ? 710 : page==="settings" ? 660 : 650
+        let h=page==="month" ? 710 : page==="timer" ? 610 : page==="settings" ? 660 : 650
         if(page==="settings" && backend.state.connectionSection) {
             const chrome=43+1+46
                          +(Theme.compact ? 8 : 12)+(Theme.compact ? 6 : 21)+settingsHeading.implicitHeight+(Theme.compact ? 6 : 8)+2
@@ -69,6 +69,7 @@ ApplicationWindow {
         w=Math.min(w,bounds.width-16)
 
         if(page==="month" && w<778) h=850
+        if(page==="timer" && w<620) h=820
 
         height=Math.min(h,bounds.height-16)
 
@@ -180,7 +181,7 @@ ApplicationWindow {
                 Layout.leftMargin: 14; Layout.rightMargin: 14; spacing: 4
                 z: 2
                 Repeater {
-                    model: [{key:"log",label:"Log time"},{key:"month",label:"Monthly hours"},{key:"settings",label:"Settings"}]
+                    model: [{key:"log",label:"Log time"},{key:"month",label:"Monthly hours"},{key:"timer",label:"Timer"},{key:"settings",label:"Settings"}]
                     Button {
                         id: folderTab
                         required property var modelData
@@ -188,7 +189,7 @@ ApplicationWindow {
                         objectName: modelData.key+"Tab"
                         Layout.alignment: Qt.AlignBottom
                         Layout.preferredHeight: selected ? 35 : 31
-                        Layout.preferredWidth: 122
+                        Layout.preferredWidth: Math.min(122,(window.width-48)/4)
                         text: modelData.label
                         Accessible.role: Accessible.PageTab
                         Accessible.name: text
@@ -290,6 +291,7 @@ ApplicationWindow {
                 }
 
                 MonthPanel { objectName: "monthPanel"; clip: true; anchors.fill: parent; visible: window.page==="month" }
+                TimerPanel { objectName: "timerPanel"; anchors.fill: parent; visible: window.page==="timer" }
 
                 ColumnLayout {
 
@@ -503,6 +505,8 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+2"; onActivated: backend.selectPanel("month") }
 
     Shortcut { sequence: "Ctrl+3"; onActivated: backend.selectPanel("settings") }
+
+    TimerPopout { }
 
     Component.onCompleted: {
 

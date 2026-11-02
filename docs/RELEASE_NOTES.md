@@ -1,4 +1,16 @@
-# FreshTray 0.2.1 — local testing build
+# FreshTray 0.3 RC1 — timer testing prerelease
+
+**Intended for testing and reporting issues. Most users should stay on [0.2](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2). This is not the stable 0.3 release.**
+
+- Added a dedicated Timer panel with start, pause/resume, reviewed duration and logging through the existing offline-safe save flow.
+- Added an independent stopwatch popout, four elapsed-time faces, animated face previews, condensed mode, opacity and pinning.
+- Added durable timer recovery and local request receipts to prevent duplicate timer saves after interruptions.
+- Fixed popout screen bounds, hover-hint placement, control alignment and changing calendar height as entries are added.
+- Included opt-out update checks with notes, verified downloads and an explicit install/restart step. Prereleases stay off the stable update channel.
+
+The timer runs locally; it does not synchronize a running timer with FreshBooks' website. Entries are limited to 24 hours and are not split automatically at midnight. See the [timer testing guide](TIMER.md).
+
+## Earlier development build: 0.2.1
 
 - Added in-app update checks, patch notes, download progress, dismissal and an explicit install/restart step.
 - Added optional daily startup checks, verified downloads and a portable replacement helper with startup acknowledgement and rollback.

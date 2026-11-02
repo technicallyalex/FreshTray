@@ -16,11 +16,14 @@ Button {
     Accessible.name: tip || text
     ToolTip.visible: hovered && tip.length>0
     ToolTip.text: tip
-    contentItem: Row {
-        spacing: 7
-        anchors.centerIn: parent
-        Icon { visible: control.glyph.length>0; name: control.glyph; ink: (control.primary || control.destructive) ? "white" : Theme.ink; anchors.verticalCenter: parent.verticalCenter }
-        Text { id: label; text: control.text; color: (control.primary || control.destructive) ? "white" : control.selected ? Theme.blue : Theme.ink; font: control.font; anchors.verticalCenter: parent.verticalCenter }
+    contentItem: Item {
+        implicitWidth: contents.implicitWidth; implicitHeight: contents.implicitHeight
+        Row {
+            id: contents; spacing: control.glyph && control.text ? 7 : 0
+            anchors.centerIn: parent
+            Icon { visible: control.glyph.length>0; name: control.glyph; ink: (control.primary || control.destructive) ? "white" : control.selected ? Theme.blue : Theme.ink; anchors.verticalCenter: parent.verticalCenter }
+            Text { id: label; visible: control.text.length>0; text: control.text; color: (control.primary || control.destructive) ? "white" : control.selected ? Theme.blue : Theme.ink; font: control.font; anchors.verticalCenter: parent.verticalCenter }
+        }
     }
     background: Rectangle {
         radius: 6

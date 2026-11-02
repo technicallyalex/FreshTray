@@ -30,6 +30,7 @@ from . import __version__
 from .qt_updates import UpdateManager
 from . import updates
 from .windows import startup_enabled, set_startup
+from .work_timer import WorkTimer
 
 
 def ident(item):
@@ -75,7 +76,7 @@ class Controller(QObject):
         self.month, self.selected = date.today().replace(day=1), date.today()
         self.month_loaded, self.month_valid = None, False
         self.forms, self.baselines, self.originals = {}, {}, {}
-        for scope in ('log', 'month'):
+        for scope in ('log', 'month', 'timer'):
             self.reset_form(scope)
         self.attempt = None
         self.pending_action = None
@@ -90,6 +91,7 @@ class Controller(QObject):
                        settings=self.settings_state(), connectionSection=not api.connected,
                        clientId=(vault.get('credentials') or {}).get('client_id', ''),
                        redirect=(vault.get('credentials') or {}).get('redirect_uri', DEFAULT_REDIRECT), authStarted=False)
+        self.work_timer = WorkTimer(self)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.poll)
         self.timer.start(25)
@@ -107,6 +109,7 @@ class Controller(QObject):
             menu = QMenu()
             for title, callback in [('Log time', lambda: self.show_panel('log')),
                                     ('Monthly hours', lambda: self.show_panel('month')),
+                                    ('Timer', lambda: self.show_panel('timer')),
                                     ('Settings', lambda: self.show_panel('settings')),
                                     ('Test reminder', self.testReminder), ('Quit FreshTray', self.requestQuit)]:
                 menu.addAction(title, callback)
@@ -122,12 +125,16 @@ class Controller(QObject):
         self.rebuild_calendar()
 
     @Property(QObject, constant=True)
+    def workTimer(self):
+        return self.work_timer
+
+    @Property(QObject, constant=True)
     def updater(self):
         return self._updater
 
     @Property('QVariantMap', notify=changed)
     def state(self):
-        return dict(self._s, log=self.form_view('log'), monthForm=self.form_view('month'),
+        return dict(self._s, log=self.form_view('log'), monthForm=self.form_view('month'), timerForm=self.form_view('timer'),
                     sync=self.offline.status() if self.offline else dict(online=True, count=0, problems=[], message=''), syncing=self.syncing, legacyPending=self.offline.legacy_pending() if self.offline else bool(self.vault.get('pending')))
 
     @Property('QVariantList', notify=calendarChanged)
@@ -246,6 +253,7 @@ class Controller(QObject):
     def setField(self, scope, key, value):
         if self._s['busy'] or scope not in self.forms or key not in self.forms[scope]:
             return
+        if scope=='timer' and (self.work_timer.saving or self.work_timer.submission):return
         form = self.forms[scope]
         if key in ('client', 'project', 'service'):
             value = str(value)
@@ -254,6 +262,8 @@ class Controller(QObject):
         if key == 'project' and value != form['project']:
             form['service'] = ''
         form[key] = value
+        if scope == 'timer':
+            self.work_timer.schedule_persist()
         if key in ('client', 'project', 'service') and value:
             self.remember_choice(key, value)
             self.sync_choices()
@@ -281,8 +291,10 @@ class Controller(QObject):
         try:
             done(future.result())
         except (ValueError, ApiError, OSError) as exc:
+            self.work_timer.save_failed()
             self.error.emit(str(exc))
         except Exception:
+            self.work_timer.save_failed()
             # Provider responses and credentials must not enter logs or dialogs.
             self.error.emit('The operation could not finish. Your draft is retained. Try again or reconnect in Settings.')
         self.emit()
@@ -304,6 +316,8 @@ class Controller(QObject):
             if not self.businesses:
                 raise ValueError('No eligible FreshBooks business. Check your membership and permissions.')
             preferred = next(iter(self.choices.recent('business', self.profile['id'])), str(self.prefs.data.get('business_id') or ''))
+            if self.work_timer.status != 'idle':
+                preferred = str(self.work_timer.business_id)
             index = next((i for i,b in enumerate(self.businesses) if ident(b) == preferred), 0)
             self.load_catalog(index)
         self.run('catalog', self.api.profile, loaded)
@@ -322,7 +336,10 @@ class Controller(QObject):
             self.sync_choices()
             self.month_loaded, self.month_valid, self.entries = None, False, []
             for scope in self.forms:
+                if scope == 'timer' and self.work_timer.status != 'idle':
+                    continue
                 self.reset_form(scope, self.selected if scope == 'month' else None)
+            self.work_timer.recover_submission()
             self.rebuild_calendar()
             if self._s['panel'] == 'month':
                 self.load_month()
@@ -340,6 +357,9 @@ class Controller(QObject):
 
     @Slot(int)
     def selectBusiness(self, index):
+        if self.work_timer.status != 'idle':
+            self.error.emit('Log or discard the current timer before changing business.')
+            return
         if self._s['busy'] or index == self._s['businessIndex'] or not 0 <= index < len(self.businesses):
             return
         if any(self.dirty(scope) or self.originals[scope] for scope in self.forms):
@@ -350,7 +370,7 @@ class Controller(QObject):
 
     @Slot(str)
     def selectPanel(self, panel):
-        if panel not in ('log', 'month', 'settings'):
+        if panel not in ('log', 'month', 'settings', 'timer'):
             return
         self._s['panel'] = panel
         if panel == 'month' and self.business and not self._s['busy']:
@@ -726,6 +746,9 @@ class Controller(QObject):
 
     @Slot()
     def disconnect(self):
+        if self.work_timer.status != 'idle':
+            self.error.emit('Log or discard the current timer before disconnecting.')
+            return
         if self._s['busy']:
             return
         def revoke():
@@ -781,6 +804,7 @@ class Controller(QObject):
                 self.rebuild_calendar()
             if count:
                 self.toast.emit(f'{count} change' + ('s' if count != 1 else '') + ' synced to FreshBooks')
+            self.work_timer.recover_submission()
             self.emit()
         def work():
             try:
@@ -959,7 +983,7 @@ class Controller(QObject):
             if self.window:
                 self.window.show()
             return
-        if any(self.dirty(scope) for scope in self.forms):
+        if any(self.dirty(scope) for scope in ('log','month')):
             if self.window:
                 self.window.show()
             self.confirm('Quit FreshTray and discard unsaved entry drafts?', self.shutdown)
@@ -996,6 +1020,9 @@ class Controller(QObject):
         self.shutdown()
 
     def shutdown(self):
+        self.work_timer.persist()
+        self.work_timer.ui.stop(); self.work_timer.checkpoint.stop()
+        self.work_timer.draft_save.stop()
         self._updater.close()
         if self.offline:
             self.offline.stopping.set()

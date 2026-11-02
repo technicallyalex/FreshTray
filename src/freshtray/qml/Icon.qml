@@ -15,6 +15,9 @@ Canvas {
             c.moveTo(8,3); c.lineTo(8,7); c.moveTo(16,3); c.lineTo(16,7)
             c.moveTo(7,14); c.lineTo(10,14); c.moveTo(14,14); c.lineTo(17,14)
             c.moveTo(7,18); c.lineTo(10,18)
+        } else if(name==="grip") { for(let x of [8,16])for(let y of [5,12,19]) { c.moveTo(x+1,y);c.arc(x,y,1,0,Math.PI*2) }
+        } else if(name==="pin") { c.moveTo(9,4);c.lineTo(15,4);c.lineTo(14,11);c.lineTo(18,15);c.lineTo(6,15);c.lineTo(10,11);c.lineTo(9,4);c.moveTo(12,15);c.lineTo(12,21)
+        } else if(name==="condense") { c.moveTo(4,4);c.lineTo(10,10);c.moveTo(10,4);c.lineTo(10,10);c.lineTo(4,10);c.moveTo(20,20);c.lineTo(14,14);c.moveTo(14,20);c.lineTo(14,14);c.lineTo(20,14)
         } else if(name==="left") { c.moveTo(14,6); c.lineTo(8,12); c.lineTo(14,18)
         } else if(name==="right") { c.moveTo(10,6); c.lineTo(16,12); c.lineTo(10,18)
         } else if(name==="down") { c.moveTo(7,10); c.lineTo(12,15); c.lineTo(17,10)

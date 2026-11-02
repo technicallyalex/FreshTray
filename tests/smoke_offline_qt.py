@@ -60,7 +60,7 @@ with tempfile.TemporaryDirectory() as folder:
     b.connectionSection(True)
     until=time.monotonic()+.5
     while time.monotonic()<until: app.processEvents(); time.sleep(.01)
-    assert w.height()==connection_height, 'Connection height should be stable across tab changes'
+    assert w.height()==connection_height, ('Connection height should be stable across tab changes',w.height(),connection_height,w.width())
     b._s['authStarted']=True; b.emit()
     until=time.monotonic()+.5
     while time.monotonic()<until: app.processEvents(); time.sleep(.01)
@@ -100,6 +100,18 @@ with tempfile.TemporaryDirectory() as folder:
     b.offline.probe = lambda: True; b.syncNow(); settle(b)
     assert b.state['sync']['count']==0 and len(b.entries)==1, errors
     assert not str(b.entries[0]['id']).startswith('local-')
+    # The actual timer adapter must use the same durable offline queue exactly once.
+    b.offline.probe=lambda:False;b.syncNow();settle(b)
+    b.setField('timer','client','123');b.setField('timer','note','Timer offline QA')
+    b.work_timer.primary();b.work_timer.pause();b.work_timer.primary();b.work_timer.duration('00:01:31')
+    b.work_timer.primary();settle(b)
+    assert b.work_timer.status=='idle' and b.state['sync']['count']==1,errors
+    b.offline.probe=lambda:True;b.syncNow();settle(b)
+    assert b.state['sync']['count']==0
+    timed=[entry for entry in provider.transport.rows.values() if entry.get('note')=='Timer offline QA']
+    assert len(timed)==1 and timed[0]['duration']==91,timed
+    b.syncNow();settle(b)
+    assert len([entry for entry in provider.transport.rows.values() if entry.get('note')=='Timer offline QA'])==1
     # Conflict review controls must be functional in both themes and compact settings.
     eid = str(b.entries[0]['id']); b.editEntry(eid); settle(b)
     b.setField('month', 'note', 'Local intent'); b.submit('month'); settle(b)

@@ -6,7 +6,7 @@ import shutil
 import zipfile
 
 root=Path(__file__).resolve().parents[1]
-version=re.search(r'__version__ = "([0-9.]+)"',(root/'src/freshtray/__init__.py').read_text(encoding='utf-8')).group(1)
+version=re.search(r'__version__ = "([0-9.]+(?:-rc\.[1-9][0-9]*)?)"',(root/'src/freshtray/__init__.py').read_text(encoding='utf-8')).group(1)
 release=root/'releases';release.mkdir(exist_ok=True)
 source=root/'app'/f'FreshTray-{version}.exe'
 if not source.is_file():
@@ -15,7 +15,7 @@ exe=release/f'FreshTray-{version}.exe'
 shutil.copy2(source,exe)
 archive=release/f'FreshTray-{version}-Windows-x64.zip'
 allowed=[root/'README.md',root/'LICENSE']
-allowed.extend(root/'docs'/name for name in ('SETUP.md','USAGE.md','SECURITY.md','DEVELOPING.md','RELEASE_NOTES.md','THIRD_PARTY_NOTICES.md'))
+allowed.extend(root/'docs'/name for name in ('SETUP.md','USAGE.md','SECURITY.md','DEVELOPING.md','RELEASE_NOTES.md','THIRD_PARTY_NOTICES.md','TIMER.md','RC_QA.md'))
 allowed.extend(p for folder in ('docs/licenses','docs/images') for p in (root/folder).rglob('*') if p.is_file())
 with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:
     z.write(exe,exe.name)

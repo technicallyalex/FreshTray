@@ -17,10 +17,14 @@ class UpdateError(ValueError):pass
 class Canceled(UpdateError):pass
 
 def version(value):
-    if not isinstance(value,str) or not re.fullmatch(r'v?\d{1,4}\.\d{1,4}(?:\.\d{1,4})?',value):
+    if not isinstance(value,str) or not re.fullmatch(r'v?\d{1,4}\.\d{1,4}(?:\.\d{1,4})?(?:-rc\.[1-9]\d{0,3})?',value):
         raise UpdateError('The release version is not supported.')
-    parts=tuple(map(int,value.lstrip('v').split('.')))
+    parts=tuple(map(int,value.lstrip('v').split('-')[0].split('.')))
     return parts+(0,)*(3-len(parts))
+
+def version_key(value):
+    numbers=version(value)
+    return numbers+((0,int(value.rsplit('.',1)[1])) if '-rc.' in value else (1,0))
 
 def checked_url(url):
     u=urlsplit(url)
@@ -56,7 +60,7 @@ class Release:
 def parse_release(data,current):
     if not isinstance(data,dict) or data.get('draft') or data.get('prerelease'):return None
     tag=data.get('tag_name','');latest=version(tag)
-    if latest<=version(current):return None
+    if version_key(tag)<=version_key(current):return None
     number=tag.lstrip('v');page=f'{WEB}/releases/tag/{tag}'
     if data.get('html_url')!=page:raise UpdateError('The release does not belong to FreshTray.')
     filename=f'FreshTray-{number}.exe';assets=data.get('assets',[])
@@ -157,7 +161,7 @@ def mark_ready(path,target,root=None):
     path,plan=read_plan(path,root)
     if Path(target).resolve()!=Path(plan['target']).resolve() or sha(target)!=plan['digest']:raise UpdateError('The updated application could not be verified.')
     from . import __version__
-    if version(plan['version'])!=version(__version__):raise UpdateError('The installed version does not match the update.')
+    if version_key(plan['version'])!=version_key(__version__):raise UpdateError('The installed version does not match the update.')
     (path.parent/'ready.json').write_text(json.dumps({'version':plan['version']}),encoding='utf-8')
 
 def terminate_child(child):

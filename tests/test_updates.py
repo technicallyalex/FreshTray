@@ -27,6 +27,13 @@ class UpdateTests(unittest.TestCase):
     def test_no_downgrade_or_same_version(self):
         self.assertIsNone(u.parse_release(release('0.2'),'0.2.1'))
         self.assertIsNone(u.parse_release(release('0.2'),'0.2.0'))
+    def test_release_candidate_upgrade_path(self):
+        self.assertIsNone(u.parse_release(release('0.2'),'0.3.0-rc.1'))
+        self.assertIsNotNone(u.parse_release(release('0.3'),'0.3.0-rc.1'))
+        self.assertGreater(u.version_key('0.3.0'),u.version_key('0.3.0-rc.2'))
+        self.assertGreater(u.version_key('0.3.0-rc.2'),u.version_key('0.3.0-rc.1'))
+        candidate=release('0.3.0-rc.1');candidate['prerelease']=True
+        self.assertIsNone(u.parse_release(candidate,'0.2'))
     def test_drafts_and_prereleases_excluded(self):
         for key in ('draft','prerelease'):
             data=release();data[key]=True;self.assertIsNone(u.parse_release(data,'0.2'))

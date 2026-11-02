@@ -183,12 +183,20 @@ class OfflineAPI:
                             return deepcopy(entry)
             raise ApiError('Download this entry while online before editing it offline.')
 
-    def _queue(self, kind, business, payload=None, original=None, identity=None):
+    def _queue(self, kind, business, payload=None, original=None, identity=None, request_id=None):
         with self.lock:
             if not self.data.get('profile') or not self.connected:
                 raise ApiError('Connect and download your account once before saving offline.')
             if self.message.startswith('This connection belongs'):
                 raise ApiError(self.message)
+            if request_id:
+                receipt=self.data.get('timer_receipts',{}).get(request_id)
+                existing=next((o for o in self.data['outbox'] if o.get('request_id')==request_id),None)
+                item=receipt or existing
+                if item:
+                    if str(item['business'])!=str(business) or item['payload']!=payload:
+                        raise ApiError('The saved timer request does not match this entry. Review sync before continuing.')
+                    return dict(deepcopy(item['entry']), **({} if receipt else {'_sync':item['state']}))
             data = deepcopy(self.data)
             current = deepcopy(original)
             eid = str((original or {}).get('id', 'local-' + uuid.uuid4().hex))
@@ -228,7 +236,7 @@ class OfflineAPI:
                     if base:
                         base['id'] = eid
                     data['outbox'].append(dict(qid=uuid.uuid4().hex, kind=kind, business=business,
-                        entry=current, original=base, payload=deepcopy(payload), state='queued', error=''))
+                        entry=current, original=base, payload=deepcopy(payload), state='queued', error='', request_id=request_id))
             self.persist(data)
             if kind == 'delete':
                 return dict(deleted=True, id=eid, business_id=business, _queued=True)
@@ -236,6 +244,21 @@ class OfflineAPI:
 
     def submit(self, business, payload):
         return self._queue('create', business, payload)
+
+    def submit_timer(self, business, payload, request_id):
+        uuid.UUID(request_id)
+        return self._queue('create',business,payload,request_id=request_id)
+
+    @locked
+    def timer_submission_state(self, request_id):
+        if request_id in self.data.get('timer_receipts',{}):return 'saved'
+        if any(o.get('request_id')==request_id for o in self.data['outbox']):return 'queued'
+        return 'absent'
+
+    @locked
+    def forget_timer_receipt(self, request_id):
+        if request_id not in self.data.get('timer_receipts',{}):return
+        data=deepcopy(self.data);data['timer_receipts'].pop(request_id);self.persist(data)
 
     def update_entry(self, business, entry_id, payload, original):
         if str(entry_id) != str(original.get('id')):
@@ -250,6 +273,10 @@ class OfflineAPI:
     @locked
     def _ack(self, op, entry=None):
         data = deepcopy(self.data)
+        if op.get('request_id'):
+            receipts=data.setdefault('timer_receipts',{})
+            receipts[op['request_id']]=dict(business=op['business'],payload=op['payload'],entry=entry or op['entry'])
+            while len(receipts)>1000:receipts.pop(next(iter(receipts)))
         old_id = str(op['entry']['id'])
         for key, entries in data['months'].items():
             if key.split('/')[0] == str(op['business']):

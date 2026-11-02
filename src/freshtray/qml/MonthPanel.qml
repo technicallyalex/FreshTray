@@ -7,12 +7,12 @@ ColumnLayout {
     property var s: backend.state
     FontMetrics { id: entryMetrics; font.family: "IBM Plex Sans"; font.pixelSize: 12 }
     readonly property int entryRowHeight: Math.max(52, Math.ceil(entryMetrics.height)*2+18)
-    // Reserve against the loaded month, never the currently selected day.
+    // Keep the calendar fixed when entries are added, removed or selected.
     readonly property int pageSize: Theme.compact ? 1 : 2
     onPageSizeChanged: backend.setEntryPageSize(pageSize)
     Component.onCompleted: backend.setEntryPageSize(pageSize)
-    readonly property int reservedRows: Math.min(pageSize,Math.max(1,backend.calendar.reduce(function(n,day) { return Math.max(n,day.entryCount || 0) },0)))
-    readonly property bool reservePager: backend.calendar.some(function(day) { return day.entryCount>panel.pageSize })
+    readonly property int reservedRows: pageSize
+    readonly property bool reservePager: true
     readonly property int entryAreaHeight: reservedRows*entryRowHeight+(reservedRows-1)*4+(reservePager ? 30 : 0)
 
     property var months: ["January","February","March","April","May","June","July","August","September","October","November","December"]

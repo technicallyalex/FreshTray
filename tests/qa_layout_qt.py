@@ -69,6 +69,7 @@ def bounds(item,w):
         parent=parent.parentItem()
     return issues
 names={
+ 'timer':['timerMainClock','timerOpacity','timerPrimary'],
  'log':['businessChoice','logClient','logDate','logHours','logSave'],
  'month-five':['monthlyCalendar','monthClient','monthDate','monthHours','monthSave','dayEntriesArea'],
  'month-six':['monthlyCalendar','monthClient','monthDate','monthHours','monthSave','dayEntriesArea'],
@@ -100,6 +101,7 @@ with tempfile.TemporaryDirectory(prefix='FreshTray-QA-') as temp:
             b.forms['log']=dict(b.baselines['log']);b.forms['month']=dict(b.baselines['month']);b.originals['month']=None
             b.emit()
             if state=='log':b.selectPanel('log')
+            elif state=='timer':b.selectPanel('timer')
             elif state.startswith('month'):
                 b.selectPanel('month');settle(b,w)
                 b.chooseMonth(2026,8 if state=='month-six' else 10);settle(b,w)

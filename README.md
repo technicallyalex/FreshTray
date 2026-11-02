@@ -1,50 +1,48 @@
-# FreshTray 0.2
+# FreshTray
 
-A complete overhaul of FreshTray, the Windows tray app for logging time to FreshBooks.
+FreshTray is a portable Windows app for logging time with your FreshBooks account. Record your work, review your hours in a monthly calendar, and get a reminder when it is time to log your day.
+
+**[Download FreshTray 0.2](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2)** · [Setup guide](docs/SETUP.md) · [Usage guide](docs/USAGE.md)
 
 ![FreshTray monthly calendar and entry form](docs/images/monthly-hours.png)
 
-## What's new
+## Features
 
-- **Rebuilt with Qt Quick.** A new PySide6 / QML interface with responsive layouts, display scaling and smoother panel transitions.
-- **A cleaner, cohesive design.** Folder-style tabs, rounded controls, light and dark themes, and a monthly calendar with time-entry editing built in.
-- **A better reminder popup.** An animated punchcard, draggable placement that is remembered, a Remind me timer, and separate sound choices for daily and follow-up reminders.
+- **Time logging:** choose your business, client, date and hours, add a note, and optionally select a project, service and billable status.
+- **Monthly calendar:** browse months, see daily, weekly and monthly hours, and add, edit or delete entries for a selected day.
+- **Reminders:** choose a daily reminder time, use a reminder popup or Windows notification, and select a sound and volume. The popup has a **Remind me** button for another reminder later.
+- **Offline work:** use previously downloaded lists and months, make changes without internet, and sync when you reconnect. Conflicts and uncertain submissions are kept for review.
+- **Personal preferences:** light and dark themes, remembered business/client choices, alphabetical or recently used dropdown sorting, startup, always-on-top and taskbar docking options.
 
-The popup is an app window, separate from Windows notification banners. It can still open when Windows notifications are disabled or Do Not Disturb is on. FreshTray must be running, the popup enabled, and the desktop available. [Reminder details](docs/USAGE.md#reminders).
+> **Optional testing:** [FreshTray 0.3 RC1](https://github.com/technicallyalex/FreshTray/releases/tag/v0.3.0-rc.1) adds a timer panel and stopwatch popout. It is a **testing prerelease**; use **0.2** for everyday work unless you want to test the timer and [report issues](https://github.com/technicallyalex/FreshTray/issues). [Timer testing guide](docs/TIMER.md).
 
-## Get started
+## Getting started
 
-Download [FreshTray 0.2](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2):
+1. Download the **.exe** from the [FreshTray 0.2 release](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2). The ZIP also includes documentation and license notices.
+2. Keep it in a permanent folder and double-click it. **FreshTray is a portable app that doesn't require installation.**
+3. Open **Settings > FreshBooks connection** and follow the [setup guide](docs/SETUP.md). You need a FreshBooks account and your own FreshBooks developer application; the guide explains where to create it and which settings to use.
+4. In **Log time**, choose your business and client, enter your hours and note, then select **Log time**.
 
-1. Download **FreshTray-0.2.exe** from the release's Assets.
-2. Keep it in a permanent folder and double-click it. No installer, Python or companion runtime folder is needed.
-3. Open **Settings > FreshBooks connection** and follow the [setup guide](docs/SETUP.md). You need your own FreshBooks developer application; no shared credentials are included.
-4. Set a reminder time under **Settings > Preferences**, then use **Test reminder**.
+Requires Windows 10/11 x64. The executable is unsigned, so Windows may show a publisher warning.
 
-Windows 10/11 x64 is required. The executable is unsigned, so Windows may show a publisher warning. Settings and encrypted account data remain in your Windows profile rather than inside the EXE.
+## Everyday use
 
-Upgrading? Finish syncing pending changes, quit the old copy from its tray menu, and open the new EXE. Existing account settings are reused. If you move the app, update **Start with Windows** from the new location.
+Use **Log time** for a new entry and **Monthly hours** to review or change a particular day. Settings apply automatically. Reminder popups work independently of Windows notification banners; FreshTray must be running and the desktop available for them to appear.
 
-## Daily use
+Before working offline, connect and open the months you need. FreshTray keeps downloaded account data and pending changes on your PC, then syncs when the connection returns. Review any sync warnings before making the same change again.
 
-Choose a business, client, date, hours and note in **Log time**, or select a day in **Monthly hours** to add, edit or delete an entry there. Common selections are remembered. Settings apply automatically.
+Settings are kept in your Windows profile. Credentials, tokens and cached account data are encrypted for your Windows account; they are not embedded in the executable or included in downloads. See [privacy and security](docs/SECURITY.md) for details.
 
-Downloaded account lists and calendar months are cached locally. Add, edit and delete entries offline; FreshTray syncs saved changes when the connection returns and asks for review if it detects a conflict or uncertain submission. Connect and open the months you need before going offline.
+## Updating
 
-See the [illustrated usage guide](docs/USAGE.md), [release notes](docs/RELEASE_NOTES.md) and [privacy/security details](docs/SECURITY.md).
+Download the version you want, finish syncing pending entries, and quit the old copy before opening the new one. Existing settings and account data are reused. If you move the executable, update **Start with Windows** from its new location. Keep a backup of your data before trying a prerelease.
 
-## Source and license
+## Help and development
 
-[Development and build instructions](docs/DEVELOPING.md). App code is [MIT licensed](LICENSE); fonts, Qt and other runtime components retain their own terms in [third-party notices](docs/THIRD_PARTY_NOTICES.md). This is an independent community app, not affiliated with or endorsed by FreshBooks.
+[Report an issue](https://github.com/technicallyalex/FreshTray/issues) with your version, the steps to reproduce it, and any relevant Windows display settings. Remove account details and credentials from screenshots and reports.
 
-Screenshots use fictional account and time-entry data generated by the included capture script.
+See [development instructions](docs/DEVELOPING.md) to edit or build the app. App code is [MIT licensed](LICENSE); fonts, Qt and other dependencies retain the terms in [third-party notices](docs/THIRD_PARTY_NOTICES.md). FreshTray is an independent community app, not affiliated with or endorsed by FreshBooks. Documentation screenshots use fictional data.
 
-## AI disclosure
+## AI assistance
 
-FreshTray was created with AI assistance for code generation, debugging, documentation, and UI development, as recorded in the original README and release notes. The maintainer confirmed on 2026-10-31 that ChatGPT was used. The records do not map each task to a particular tool or model, identify every affected file, or quantify the proportion of AI-generated material. Additional historical tools, if any, remain unverified.
-
-OpenAI Codex was used for the 2026-10-31 repository audit and to draft these disclosure and licensing documentation changes. This describes this audit only and does not establish earlier Codex use.
-
-AI assistance does not change the project's license or establish rights in third-party code or assets.
-
-OpenAI Codex also assisted with the 0.2 overhaul, testing and documentation.
+FreshTray was created with AI assistance, including ChatGPT and OpenAI Codex, for code, UI design, debugging, testing and documentation. AI assistance does not change the project's license or the terms of third-party components.

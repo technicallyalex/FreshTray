@@ -65,8 +65,9 @@ Item {
         Card {
             outlined: true
             id: notificationsCard; objectName: "notificationsCard"
+            Layout.minimumHeight: implicitHeight
             Layout.fillHeight: true
-            padding: Theme.compact ? 8 : 14
+            padding: Theme.compact ? 6 : 14
 
             Layout.fillWidth: true; Layout.preferredWidth: 360
 
@@ -124,14 +125,21 @@ Item {
 
         Card {
             outlined: true
-            padding: Theme.compact ? 8 : 14
+            padding: Theme.compact ? 6 : 14
             id: soundOptionsCard; objectName: "soundOptionsCard"
             Layout.fillWidth: true; Layout.fillHeight: true; Layout.preferredWidth: 260
-            Layout.preferredHeight: notificationsCard.implicitHeight
+            Layout.minimumHeight: implicitHeight
             ColumnLayout {
                 anchors.fill: parent; spacing: Theme.compact ? 2 : 5
                 Text { text: "Sound options"; color: Theme.ink; font.pixelSize: 16; font.bold: true }
+                RowLayout {
+                    Layout.fillWidth: true; spacing: 12
                     Check { objectName: "popupSoundToggle"; text: "Popup sounds"; checked: !!panel.draft.popup_sound; onClicked: panel.change("popup_sound",checked) }
+                    Check { objectName: "repeatPopupSoundToggle"; text: "Repeat"; Accessible.name: "Repeat until dismissed"; enabled: !!panel.draft.popup_sound; checked: !!panel.draft.popup_sound_repeat; onClicked: panel.change("popup_sound_repeat",checked)
+                        ToolTip.visible: hovered; ToolTip.text: "Repeat until the popup is dismissed"
+                    }
+                    Item { Layout.fillWidth: true }
+                }
                 RowLayout {
                     Layout.fillWidth: true; Layout.fillHeight: false; spacing: 7
                     Text { Layout.preferredWidth: 64; text: "Main popup"; color: Theme.ink; font.pixelSize: 12 }
@@ -184,7 +192,7 @@ Item {
 
         Card {
             outlined: true
-            padding: Theme.compact ? 8 : 14
+            padding: Theme.compact ? 6 : 14
 
             Layout.fillWidth: true
 

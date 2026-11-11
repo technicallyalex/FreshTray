@@ -73,7 +73,7 @@ names={
  'log':['businessChoice','logClient','logDate','logHours','logSave'],
  'month-five':['monthlyCalendar','monthClient','monthDate','monthHours','monthSave','dayEntriesArea'],
  'month-six':['monthlyCalendar','monthClient','monthDate','monthHours','monthSave','dayEntriesArea'],
- 'preferences':['dropdownSorting','versionLink','remindMeDelay','popupSoundChoice','remindMeSoundChoice','popupVolume','automaticUpdates','checkUpdates'],
+ 'preferences':['repeatPopupSoundToggle','dropdownSorting','versionLink','remindMeDelay','popupSoundChoice','remindMeSoundChoice','popupVolume','automaticUpdates','checkUpdates'],
  'connection':['oauthClient','oauthSecret','oauthRedirect','oauthSignIn','refreshAccountData','disconnectAccount'],
  'return':['oauthReturned','oauthFinish','oauthBack','refreshAccountData','disconnectAccount'],
  'review':['syncReviewChoice','discardSyncChange','refreshAccountData','disconnectAccount'],
@@ -124,6 +124,16 @@ with tempfile.TemporaryDirectory(prefix='FreshTray-QA-') as temp:
                 if item is None:issues.append(name+': missing QA handle');continue
                 if not item.isVisible():issues.append(name+': unexpectedly hidden');continue
                 issues.extend(name+': '+issue for issue in bounds(item,w))
+            if state=='preferences':
+                volume=w.findChild(QQuickItem,'popupVolume')
+                card=w.findChild(QQuickItem,'soundOptionsCard')
+                bottom=xy(volume).y()+volume.height()
+                if bottom>xy(card).y()+card.height()-card.property('bottomPadding')+1:
+                    issues.append('sound volume escapes its card')
+                # Check the next settings card, not only overall window bounds.
+                for sibling in card.parentItem().parentItem().childItems():
+                    if sibling is not card.parentItem() and sibling.isVisible() and sibling.height()>100 and xy(sibling).y()>xy(card).y():
+                        if bottom>xy(sibling).y()+1:issues.append('sound volume overlaps next settings card')
             if state.startswith('month'):
                 cal=w.findChild(QQuickItem,'monthlyCalendar')
                 def descendants(item):

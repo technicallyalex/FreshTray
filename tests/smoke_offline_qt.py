@@ -39,6 +39,7 @@ with tempfile.TemporaryDirectory() as folder:
     b.offline.probe = lambda: True
     b.sync_timer.stop()  # Controlled connectivity transitions, not wall-clock timing.
     errors = []; b.error.connect(errors.append)
+    notices = []; b.toast.connect(notices.append)
     e = QQmlApplicationEngine(); e.rootContext().setContextProperty('backend', b)
     e.load(QUrl.fromLocalFile(str(root/'src/freshtray/qml/Main.qml')))
     assert e.rootObjects(), messages
@@ -83,12 +84,21 @@ with tempfile.TemporaryDirectory() as folder:
     b.applySetting('theme','light')
 
     b.selectPanel('month'); settle(b)
+    notices.clear()
+    b.setField('month','client','123'); b.setField('month','hours','0:01'); b.setField('month','note','Immediate sync QA')
+    b.submit('month'); settle(b)
+    assert b.state['sync']['count']==0 and any(row.get('note')=='Immediate sync QA' for row in provider.transport.rows.values()), 'Save must upload without the periodic sync timer'
+    assert not notices, notices
+    provider.transport.rows.clear(); b.syncNow(); settle(b)
     b.offline.probe = lambda: False
     b.syncNow(); settle(b)
     assert b.state['sync']['online'] is False
     b.setField('month', 'client', '123'); b.setField('month', 'hours', '3:00'); b.setField('month', 'note', 'Offline UI test')
     b.submit('month'); settle(b)
     assert b.state['sync']['count']==1 and len(b.state['entries'])==1, errors
+    assert len(notices)==1 and 'saved locally' in notices[0] and 'once connected' in notices[0], notices
+    b.syncNow(); settle(b)
+    assert len(notices)==1, 'Repeated retries must not spam notices'
     eid = b.state['entries'][0]['id']; assert eid.startswith('local-')
     b.editEntry(eid); settle(b)
     b.setField('month', 'note', 'Edited offline'); b.submit('month'); settle(b)
@@ -113,9 +123,11 @@ with tempfile.TemporaryDirectory() as folder:
     b.syncNow();settle(b)
     assert len([entry for entry in provider.transport.rows.values() if entry.get('note')=='Timer offline QA'])==1
     # Conflict review controls must be functional in both themes and compact settings.
+    b.offline.probe=lambda:False
     eid = str(b.entries[0]['id']); b.editEntry(eid); settle(b)
     b.setField('month', 'note', 'Local intent'); b.submit('month'); settle(b)
     provider.transport.rows[int(eid)]['note'] = 'Changed elsewhere'
+    b.offline.probe=lambda:True
     b.syncNow(); settle(b)
     assert b.state['sync']['problems'][0]['status']=='conflict', errors
     b.showSync(); settle(b)

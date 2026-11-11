@@ -37,7 +37,7 @@ class PopupChime:
         self.folder = None
         self.cache = OrderedDict()
 
-    def play(self, sound='ethereal', volume=60):
+    def play(self, sound='ethereal', volume=60, repeat=False):
         try:
             sound, volume = sound_settings(sound, volume)
         except ValueError:
@@ -53,9 +53,9 @@ class PopupChime:
                 pass
             if volume == 0:
                 return None
-            return self.executor.submit(self._play, sound, volume, generation)
+            return self.executor.submit(self._play, sound, volume, generation, repeat)
 
-    def _play(self, sound, volume, generation):
+    def _play(self, sound, volume, generation, repeat=False):
         with self.lock:
             if self.closed or generation != self.generation:
                 return
@@ -93,7 +93,7 @@ class PopupChime:
             with self.lock:
                 if self.closed or generation != self.generation:
                     return
-                winsound.PlaySound(str(target), winsound.SND_FILENAME|winsound.SND_ASYNC|winsound.SND_NODEFAULT)
+                winsound.PlaySound(str(target), winsound.SND_FILENAME|winsound.SND_ASYNC|winsound.SND_NODEFAULT|(winsound.SND_LOOP if repeat else 0))
         except (RuntimeError, OSError, ValueError, wave.Error, EOFError):
             pass  # Missing files or unavailable output never block the popup.
 

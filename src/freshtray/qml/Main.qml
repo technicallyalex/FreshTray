@@ -457,6 +457,7 @@ ApplicationWindow {
         onXChanged: if(presented && visible && !presenting && !entering) rememberPosition.restart()
         onYChanged: if(presented && visible && !presenting && !entering) rememberPosition.restart()
         onVisibleChanged: if(!visible && presented) {
+            backend.reminderClosed()
             rememberPosition.stop()
             if(entering) { reminderEntrance.stop(); y=destinationY }
             savePosition()
@@ -492,7 +493,7 @@ ApplicationWindow {
                 Caption { Layout.fillWidth: true; text: "Add today's work to FreshBooks."; horizontalAlignment: Text.AlignHCenter }
                 RowLayout {
                     Layout.fillWidth: true; Layout.topMargin: 10; spacing: 10
-                    AppButton { objectName: "reminderLater"; text: "Later"; Layout.fillWidth: true; Layout.preferredWidth: 1; onClicked: reminderWindow.hide() }
+                    AppButton { objectName: "reminderLater"; text: "Dismiss"; Layout.fillWidth: true; Layout.preferredWidth: 1; onClicked: reminderWindow.hide() }
                     AppButton { objectName: "reminderAgain"; text: "Remind me"; Layout.fillWidth: true; Layout.preferredWidth: 1; tip: "Show again in " + backend.state.settings.remind_me_minutes + " minutes"; onClicked: if(backend.remindMe()) reminderWindow.hide() }
                     AppButton { objectName: "reminderLog"; text: "Log hours"; primary: true; glyph: "check"; Layout.fillWidth: true; Layout.preferredWidth: 1; onClicked: { reminderWindow.hide(); backend.logFromReminder() } }
                 }

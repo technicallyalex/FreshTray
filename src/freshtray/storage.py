@@ -62,7 +62,7 @@ class Vault:
 
 
 DEFAULTS = {"reminders": True, "reminder_popup": True, "time": "17:00", "weekdays_only": True,
-            "last_reminded": "", "business_id": None, "always_on_top": False, "docked_mode": False, "close_to_tray": True, "theme": "system", "window_size": None, "layout_revision": 0, "dropdown_sort": "alphabetical", "reminder_position": None, "remind_me_minutes": 15, "reminder_again_at": None, "popup_sound": True, "popup_sound_choice": "ethereal", "remind_me_sound_choice": "ethereal", "popup_volume": 60}
+            "last_reminded": "", "business_id": None, "always_on_top": False, "docked_mode": False, "close_to_tray": True, "theme": "system", "window_size": None, "layout_revision": 0, "dropdown_sort": "alphabetical", "reminder_position": None, "remind_me_minutes": 15, "reminder_again_at": None, "popup_sound": True, "popup_sound_repeat": False, "popup_sound_choice": "ethereal", "remind_me_sound_choice": "ethereal", "popup_volume": 60}
 
 
 class Preferences:

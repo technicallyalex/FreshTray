@@ -34,10 +34,10 @@ In Preferences, enable the daily reminder, select a local time and AM/PM, and ch
 
 - **Log hours** opens the entry form.
 - **Remind me** schedules another popup using **Popup “Remind me” timer** in Preferences (1–1440 minutes). It does not change the daily reminder time. The timer survives an app restart.
-- **Later** dismisses this popup without scheduling another.
+- **Dismiss** dismisses this popup without scheduling another.
 - Drag the dotted handle to move the popup. Its location is remembered and kept within the available desktop.
 
-The punchcard animates; the clock hands show the PC's local time when the popup opens. Windows reduced-motion settings reduce animation. In Sound options, choose separate sounds for **Main popup** and **Remind me**, use **Play** to preview, or switch off Popup sounds. The volume slider changes only FreshTray's popup sounds; system mute and volume still apply.
+The punchcard animates; the clock hands show the PC's local time when the popup opens. Windows reduced-motion settings reduce animation. In Sound options, choose separate sounds for **Main popup** and **Remind me**, use **Play** to preview, or switch off Popup sounds. The volume slider changes only FreshTray's popup sounds; system mute and volume still apply. Enable **Repeat** to loop the selected sound while either reminder popup is open. Dismiss, Remind me, and Log hours stop playback; previews play once.
 
 ### Windows notifications and timing
 
@@ -47,7 +47,7 @@ FreshTray must be running. It cannot wake a sleeping computer or display above t
 
 ## Offline work
 
-Connect once and open the months you want available before losing internet. Account lists and downloaded months are cached in Windows-encrypted storage. You can add, edit and delete locally while offline. The app overlays queued changes on the calendar and syncs automatically when it reconnects, checking at intervals of up to a minute after a disconnection.
+Connect once and open the months you want available before losing internet. Account lists and downloaded months are cached in Windows-encrypted storage. You can add, edit and delete locally while offline. Each change is saved to the encrypted local queue, then sync starts immediately in the background. Successful saves and syncs are quiet. If syncing fails, a notice confirms the change is saved locally; connection retries continue automatically, at intervals of up to a minute after a disconnection. Repeated retries do not repeat the same warning.
 
 If you edit then delete an unsynced new entry, its addition is canceled locally. FreshTray checks for changes made elsewhere before updating or deleting. Conflicts and submissions whose outcome is uncertain remain under **Settings > FreshBooks connection** for review. Check FreshBooks before discarding an uncertain local change; it may already exist there. Ambiguous additions are not blindly replayed.
 

@@ -92,3 +92,17 @@ class ChimeTests(unittest.TestCase):
             self.assertEqual(loaded.data['popup_sound_choice'],'servo_sweep')
             self.assertEqual(loaded.data['remind_me_sound_choice'],'punchcard')
             self.assertEqual(loaded.data['popup_volume'],35)
+
+    def test_repeat_is_opt_in_and_stop_cancels_playback(self):
+        import winsound
+        with patch('freshtray.alert_sound.winsound.PlaySound') as play:
+            chime = PopupChime(ASSETS/'reminder.wav')
+            try:
+                chime.play(repeat=True).result(timeout=2)
+                self.assertTrue(play.call_args.args[1] & winsound.SND_LOOP)
+                chime.stop()
+                self.assertEqual(play.call_args.args, (None, 0))
+                chime.play().result(timeout=2)
+                self.assertFalse(play.call_args.args[1] & winsound.SND_LOOP)
+            finally:
+                chime.close()

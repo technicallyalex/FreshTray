@@ -63,6 +63,8 @@ class Controller(QObject):
             api.transport.timeout = 8
         self.api, self.vault, self.prefs = self.offline or ReadCache(api), vault, prefs
         self.syncing, self.next_sync, self.retry_delay = False, 0, 15
+        self.sync_requested = False
+        self.sync_notice = None
         self.assets, self.launcher, self.demo = Path(assets), launcher, demo
         self.choices = ChoiceHistory(vault)
         self.popup_chime = PopupChime(self.assets/'sounds/reminder.wav')
@@ -298,6 +300,8 @@ class Controller(QObject):
             # Provider responses and credentials must not enter logs or dialogs.
             self.error.emit('The operation could not finish. Your draft is retained. Try again or reconnect in Settings.')
         self.emit()
+        if self.sync_requested:
+            self.syncOffline()
 
     @Slot()
     def start(self):
@@ -544,7 +548,8 @@ class Controller(QObject):
 
     def deleted_entry(self, result):
         if not self.business or str(result.get('business_id', self.business['id'])) != str(self.business['id']):
-            self.toast.emit('Time entry deletion confirmed')
+            if self.offline:self.request_sync()
+            else:self.toast.emit('Time entry deletion confirmed')
             return
         entry_id = str(result['id'])
         for scope in self.forms:
@@ -554,8 +559,10 @@ class Controller(QObject):
         self.month_valid, self.month_loaded = False, None
         self._s['monthReady'] = False
         self.rebuild_calendar()
-        self.toast.emit('Deletion saved locally · waiting to sync' if result.get('_queued') else 'Preview entry deleted' if self.demo else 'Time entry deleted')
-        self.next_sync = 0
+        if self.offline:
+            self.request_sync()
+        else:
+            self.toast.emit('Preview entry deleted' if self.demo else 'Time entry deleted')
         if self._s['panel'] == 'month':
             self.load_month(force=True)
 
@@ -630,9 +637,11 @@ class Controller(QObject):
                     self.month = self.selected.replace(day=1)
                     self.entries = []
                     self.rebuild_calendar()
-                self.next_sync = 0
-                self.toast.emit(('Saved locally · waiting to sync' if entry.get('_sync') else 'Preview saved locally' if self.demo else 'Changes saved' if original else 'Time logged') +
-                                ' · ' + format_duration(payload['time_entry']['duration']) + ' hours')
+                if self.offline:
+                    self.request_sync()
+                else:
+                    self.toast.emit(('Preview saved locally' if self.demo else 'Changes saved' if original else 'Time logged') +
+                                    ' · ' + format_duration(payload['time_entry']['duration']) + ' hours')
                 if self._s['panel'] == 'month':
                     self.load_month()
             work = (lambda: self.api.update_entry(bid, original['id'], payload, original)) if original else lambda: self.api.submit(bid, payload)
@@ -649,7 +658,7 @@ class Controller(QObject):
     @Slot(str, 'QVariant')
     def applySetting(self, key, value):
         allowed = ('clock', 'period', 'reminders', 'reminder_popup', 'weekdays_only',
-                   'startup', 'always_on_top', 'docked_mode', 'close_to_tray', 'theme', 'dropdown_sort', 'remind_me_minutes', 'popup_sound', 'popup_sound_choice', 'remind_me_sound_choice', 'popup_volume')
+                   'startup', 'always_on_top', 'docked_mode', 'close_to_tray', 'theme', 'dropdown_sort', 'remind_me_minutes', 'popup_sound', 'popup_sound_repeat', 'popup_sound_choice', 'remind_me_sound_choice', 'popup_volume')
         if key not in allowed:
             return
         values = self.settings_state()
@@ -662,7 +671,7 @@ class Controller(QObject):
             values = dict(values)
             stored = parse_reminder_time(values.pop('clock'), values.pop('period'))
             startup = values.pop('startup')
-            allowed = ('reminders', 'reminder_popup', 'weekdays_only', 'always_on_top', 'docked_mode', 'close_to_tray', 'theme', 'dropdown_sort', 'remind_me_minutes', 'popup_sound', 'popup_sound_choice', 'remind_me_sound_choice', 'popup_volume')
+            allowed = ('reminders', 'reminder_popup', 'weekdays_only', 'always_on_top', 'docked_mode', 'close_to_tray', 'theme', 'dropdown_sort', 'remind_me_minutes', 'popup_sound', 'popup_sound_repeat', 'popup_sound_choice', 'remind_me_sound_choice', 'popup_volume')
             clean = {k: values[k] for k in allowed if k in values}
             if 'popup_sound_choice' in clean or 'popup_volume' in clean:
                 clean['popup_sound_choice'], clean['popup_volume'] = sound_settings(clean.get('popup_sound_choice', 'ethereal'), clean.get('popup_volume', 60))
@@ -676,7 +685,7 @@ class Controller(QObject):
                 set_startup(bool(startup), self.launcher)
             previous = dict(self.prefs.data)
             self.prefs.save(time=stored, **clean)
-            if (previous.get('popup_sound',True) and not self.prefs.data.get('popup_sound',True)) or any(previous.get(k) != self.prefs.data.get(k) for k in ('popup_sound_choice', 'remind_me_sound_choice', 'popup_volume')):
+            if (previous.get('popup_sound',True) and not self.prefs.data.get('popup_sound',True)) or any(previous.get(k) != self.prefs.data.get(k) for k in ('popup_sound_choice', 'remind_me_sound_choice', 'popup_volume', 'popup_sound_repeat')):
                 self.popup_chime.stop()
             self._s['settings'] = self.settings_state()
             self.sync_choices()
@@ -777,16 +786,45 @@ class Controller(QObject):
         else:
             reload()
 
+    def request_sync(self):
+        # Dispatch after the save callback finishes, including any local view load.
+        # Retain the request if another sync is already in flight.
+        if self.offline:
+            self.sync_requested = True
+            self.next_sync = 0
+            QTimer.singleShot(0, self.syncOffline)
+
+    def notify_sync_issue(self, status):
+        if not status['count']:
+            self.sync_notice = None
+            return
+        if status['problems'] or self.offline.legacy_pending():
+            notice = 'review'
+            message = 'Your changes are saved locally. Sync needs attention; open FreshBooks connection settings to review them.'
+        elif status['online'] is False:
+            notice = 'offline'
+            message = 'Your changes are saved locally and will sync automatically once connected to FreshBooks.'
+        elif status['message'] or any(op.get('error') for op in self.offline.data['outbox']):
+            notice = 'paused'
+            message = 'Your changes are saved locally. Sync could not finish and will retry automatically; check FreshBooks connection settings if this continues.'
+        else:
+            return
+        if notice != self.sync_notice:
+            self.sync_notice = notice
+            self.toast.emit(message)
+
     @Slot()
     def syncOffline(self):
         if not self.offline or self.syncing or self._s['busy'] or not self.api.connected or time.monotonic() < self.next_sync:
             return
+        self.sync_requested = False
         self.syncing = True
         def done(count):
             self.syncing = False
             status = self.offline.status()
             self.retry_delay = min(60, self.retry_delay*2) if status['online'] is False else 15
-            self.next_sync = time.monotonic() + self.retry_delay
+            self.next_sync = 0 if self.sync_requested else time.monotonic() + self.retry_delay
+            self.notify_sync_issue(status)
             if self.business:
                 catalog = deepcopy(self.offline.data['catalogs'].get(str(self.business['id'])))
                 if catalog:
@@ -802,8 +840,6 @@ class Controller(QObject):
             if self.business and self.month_loaded:
                 self.entries = self.offline.view_month(self.business['id'], self.month, self.profile['id'])
                 self.rebuild_calendar()
-            if count:
-                self.toast.emit(f'{count} change' + ('s' if count != 1 else '') + ' synced to FreshBooks')
             self.work_timer.recover_submission()
             self.emit()
         def work():
@@ -903,7 +939,11 @@ class Controller(QObject):
     def reminderOpened(self):
         if self.prefs.data.get('popup_sound',True):
             key = 'remind_me_sound_choice' if self.reminder_is_followup else 'popup_sound_choice'
-            self.popup_chime.play(self.prefs.data.get(key,'ethereal'), self.prefs.data.get('popup_volume',60))
+            self.popup_chime.play(self.prefs.data.get(key,'ethereal'), self.prefs.data.get('popup_volume',60), repeat=bool(self.prefs.data.get('popup_sound_repeat', False)))
+
+    @Slot()
+    def reminderClosed(self):
+        self.popup_chime.stop()
 
     @Slot()
     def previewSound(self):

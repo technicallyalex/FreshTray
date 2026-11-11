@@ -1,3 +1,16 @@
+# FreshTray 0.3 RC2 — timer testing prerelease
+
+**For testing and reporting issues. Most users should stay on [0.2](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2). This is not the stable 0.3 release.**
+
+- Entry additions, edits, deletions and timer saves now start background sync immediately after their encrypted local save, rather than waiting for the periodic check.
+- Removed routine save/sync confirmations. Connection failures show a notice that changes are saved locally and will sync once connected. Repeated retries do not repeat the same notice; conflicts and uncertain submissions still require review.
+- Added **Repeat** in Sound options for both main and follow-up reminder popups. Closing the popup, choosing Remind me or opening Log hours stops playback. Sound previews play once.
+- Renamed the reminder's Later button to **Dismiss** and moved the timer popout drag handle to the upper-right corner.
+
+Includes RC1's timer panel, four elapsed-time faces, independent stopwatch popout, and encrypted timer recovery. The timer runs locally, not in sync with a running FreshBooks website timer. See [TIMER.md](TIMER.md) and [RC_QA.md](RC_QA.md).
+
+---
+
 # FreshTray 0.3 RC1 — timer testing prerelease
 
 **Intended for testing and reporting issues. Most users should stay on [0.2](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2). This is not the stable 0.3 release.**

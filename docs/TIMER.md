@@ -1,6 +1,6 @@
 # Testing the 0.3 timer
 
-**0.3 RC1 is intended for testing and issue reporting. Use [0.2](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2) for everyday time logging.** The RC uses the same Windows-profile data as the stable app. Back it up before switching builds, finish syncing entries, and run only one copy at a time.
+**0.3 RC2 is intended for testing and issue reporting. Use [0.2](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2) for everyday time logging.** The RC uses the same Windows-profile data as the stable app. Back it up before switching builds, finish syncing entries, and run only one copy at a time.
 
 ## Track time
 

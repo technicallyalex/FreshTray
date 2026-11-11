@@ -68,6 +68,10 @@ Window {
             RowLayout {
                 objectName: "timerPopoutTitlebar"
                 Layout.fillWidth: true; Layout.preferredHeight: 28; visible: !pop.timerData.condensed; spacing: 3
+                Item { Layout.fillWidth: true }
+                AppButton { objectName: "timerCondense"; glyph: "condense"; implicitWidth: 28; implicitHeight: 28; quiet: true; Accessible.name: "Timer only"; onClicked: backend.workTimer.setting("condensed",true) }
+                AppButton { objectName: "timerPin"; glyph: "pin"; implicitWidth: 28; implicitHeight: 28; quiet: true; selected: pop.timerData.pinned; Accessible.name: "Keep timer on top"; onClicked: backend.workTimer.setting("pinned",!pop.timerData.pinned) }
+                AppButton { objectName: "timerPopoutClose"; glyph: "close"; implicitWidth: 28; implicitHeight: 28; quiet: true; Accessible.name: "Close timer pop-out"; onClicked: backend.workTimer.setting("popout",false) }
                 Item {
                     Layout.preferredWidth: 28; Layout.preferredHeight: 28
                     Icon { anchors.centerIn: parent; name: "grip"; ink: Theme.muted }
@@ -78,10 +82,6 @@ Window {
                         onCanceled: pop.dragging=false
                     }
                 }
-                Item { Layout.fillWidth: true }
-                AppButton { objectName: "timerCondense"; glyph: "condense"; implicitWidth: 28; implicitHeight: 28; quiet: true; Accessible.name: "Timer only"; onClicked: backend.workTimer.setting("condensed",true) }
-                AppButton { objectName: "timerPin"; glyph: "pin"; implicitWidth: 28; implicitHeight: 28; quiet: true; selected: pop.timerData.pinned; Accessible.name: "Keep timer on top"; onClicked: backend.workTimer.setting("pinned",!pop.timerData.pinned) }
-                AppButton { objectName: "timerPopoutClose"; glyph: "close"; implicitWidth: 28; implicitHeight: 28; quiet: true; Accessible.name: "Close timer pop-out"; onClicked: backend.workTimer.setting("popout",false) }
             }
             Text { visible: !pop.timerData.condensed; Layout.alignment: Qt.AlignHCenter; Layout.maximumWidth: pop.width-24; elide: Text.ElideRight; text: { const c=backend.state.clients.find(c=>c.value===backend.state.timerForm.client);return c ? c.name : "" } color: Theme.ink; font.pixelSize: 13; font.bold: true }
             ClockFace {

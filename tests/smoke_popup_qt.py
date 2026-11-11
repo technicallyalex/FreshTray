@@ -56,6 +56,14 @@ with tempfile.TemporaryDirectory(prefix='FreshTray-Popup-QA-') as d,patch('fresh
         assert b.deliver_delayed_reminder();pump()
         assert reminder.isVisible() and b.reminder_is_followup
         reminder.hide();prefs.save(reminder_popup=True)
+    prefs.save(popup_sound=True, popup_sound_repeat=True)
+    with patch.object(b.popup_chime, 'play') as play, patch.object(b.popup_chime, 'stop') as stop:
+        b.testReminder();pump()
+        assert play.call_args.kwargs.get('repeat') is True
+        reminder.hide();pump(.03)
+        assert stop.called, 'Hidden reminder must stop repeating audio'
+        b.previewSound()
+        assert not play.call_args.kwargs.get('repeat', False), 'Preview must not loop'
     b.tray=None;b.timer.stop();b.delay_timer.stop();b.popup_chime.close()
     b.local_executor.shutdown(wait=True);b.executor.shutdown(wait=True)
     w.hide();e.deleteLater();QCoreApplication.sendPostedEvents(None,QEvent.DeferredDelete)

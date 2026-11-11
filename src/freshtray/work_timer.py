@@ -217,7 +217,8 @@ class WorkTimer(QObject):
             if cleared and b.offline:
                 try:b.offline.forget_timer_receipt(request)
                 except OSError:pass
-            b.toast.emit('Timer saved locally · waiting to sync' if entry.get('_sync') else 'Timer logged')
+            if b.offline:b.request_sync()
+            else:b.toast.emit('Timer logged')
             if b._s['panel']=='month':b.load_month(force=True)
         def work():return b.offline.submit_timer(self.business_id,payload,self.request_id) if b.offline else b.api.submit(self.business_id,payload)
         if not b.run('save',work,saved):self.saving=False;self.submission=None;self.persist();self.changed.emit()

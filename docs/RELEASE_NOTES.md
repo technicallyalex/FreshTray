@@ -1,3 +1,16 @@
+# FreshTray 0.3 RC3 — popup entry testing prerelease
+
+**For testing and reporting issues. Most users should stay on [0.2](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2). This is not the stable 0.3 release.**
+
+- **Log hours** in the reminder now turns the popup into a one-use entry form instead of opening the main window. Choose business/client, optional project/service, date, hours, note and billable status.
+- A successful encrypted local save shows a brief confirmation, starts background sync and closes only the popup. Offline entries remain queued for reconnection. Validation and local-storage failures keep the form open.
+- The reminder draft is separate from the main-window draft. Cancel closes without saving. Date picking and duplicate confirmations stay in the popup.
+- Closing the popup cancels a pending duplicate confirmation. Log hours waits for any current operation to finish before opening the form.
+
+Includes RC2's immediate sync and repeating reminder sounds, plus RC1's timer panel and stopwatch popout. See [USAGE.md](USAGE.md), [TIMER.md](TIMER.md) and [RC_QA.md](RC_QA.md).
+
+---
+
 # FreshTray 0.3 RC2 — timer testing prerelease
 
 **For testing and reporting issues. Most users should stay on [0.2](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2). This is not the stable 0.3 release.**

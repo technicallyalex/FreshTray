@@ -4,7 +4,7 @@ import QtQuick.Layouts
 ColumnLayout {
     id: form
     required property string scope
-    property var formData: scope==="log" ? backend.state.log : backend.state.monthForm
+    property var formData: scope==="reminder" ? backend.state.reminderForm : scope==="log" ? backend.state.log : backend.state.monthForm
     property bool compact: false
     property bool ready: backend.state.catalogReady && (scope!=="month" || backend.state.monthReady)
     property bool canEdit: ready && !backend.state.busy && (scope!=="month" || backend.state.selected<=Qt.formatDate(new Date(),"yyyy-MM-dd"))

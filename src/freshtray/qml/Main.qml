@@ -120,12 +120,20 @@ ApplicationWindow {
 
         function onFitRequested() { window.fitPanel(); if(window.page==="settings") settingsRefit.restart() }
 
-        function onToast(message) { toastText.text=message; toast.visible=true; toastTimer.restart() }
+        function onToast(message) { if(reminderWindow.visible && reminderWindow.logging) { reminderWindow.feedback=message; return } toastText.text=message; toast.visible=true; toastTimer.restart() }
 
-        function onError(message) { if(!window.visible) { window.show(); window.requestActivate() } errorText.text=message; errorDialog.open() }
+        function onError(message) { if(reminderWindow.visible && reminderWindow.logging) { reminderWindow.problem=message; return } if(!window.visible) { window.show(); window.requestActivate() } errorText.text=message; errorDialog.open() }
 
         function onConfirmation(title,message) { confirmDialog.title=title; confirmText.text=message; confirmDialog.open() }
 
+        function onEntrySaved(scope, hours) {
+            if(scope==="reminder" && reminderWindow.visible && reminderWindow.logging) {
+                reminderWindow.completed=true
+                reminderWindow.problem=""
+                reminderWindow.feedback="Entry saved · "+hours+" hours"
+                reminderCloseTimer.restart()
+            }
+        }
         function onReminder() { reminderWindow.present() }
 
     }
@@ -391,9 +399,9 @@ ApplicationWindow {
 
     Dialog {
 
-        id: confirmDialog; objectName: "confirmDialog"; parent: Overlay.overlay; modal: true
+        id: confirmDialog; objectName: "confirmDialog"; parent: reminderWindow.visible && reminderWindow.logging ? reminderWindow.contentItem : Overlay.overlay; modal: true
 
-        x: (window.width-width)/2; y: (window.height-height)/2; width: Math.min(440,window.width-40)
+        x: (parent.width-width)/2; y: (parent.height-height)/2; width: Math.min(440,parent.width-40)
 
         header: Text { text: confirmDialog.title; color: Theme.ink; font.bold: true; font.pixelSize: 15; padding: 16 }
 
@@ -418,13 +426,26 @@ ApplicationWindow {
         }
     }
 
-    Window {
+    ApplicationWindow {
         id: reminderWindow; objectName: "reminderWindow"
         width: 400; height: 390; visible: false
         title: "FreshTray reminder"
         flags: Qt.Tool | Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint
         color: "transparent"
+        property bool logging: false
+        property bool completed: false
+        property string problem: ""
+        property string feedback: ""
         property bool presenting: false
+        function openEntry() {
+            logging=true; problem=""; feedback=""; completed=false
+            if(!backend.logFromReminder()) { logging=false; return }
+            reminderEntrance.stop(); opacity=1
+            const placement=backend.reminderPlacement(560,650)
+            presenting=true
+            width=placement.width; height=placement.height; x=placement.x; y=placement.y
+            presenting=false
+        }
         property bool presented: false
         property bool entering: reminderEntrance.running
         property real destinationY: 0
@@ -432,6 +453,7 @@ ApplicationWindow {
         function savePosition() { backend.rememberReminderPosition(Math.round(x),Math.round(y)) }
         function present() {
             if(!visible) {
+                logging=false; completed=false; problem=""; feedback=""
                 presenting=true
                 rememberPosition.stop()
                 reminderDial.captureTime()
@@ -458,17 +480,32 @@ ApplicationWindow {
         onYChanged: if(presented && visible && !presenting && !entering) rememberPosition.restart()
         onVisibleChanged: if(!visible && presented) {
             backend.reminderClosed()
+            reminderCloseTimer.stop()
+            if(logging && confirmDialog.visible) confirmDialog.reject()
+            if(logging) backend.clearReminderEntry()
+            logging=false
             rememberPosition.stop()
             if(entering) { reminderEntrance.stop(); y=destinationY }
             savePosition()
             opacity=1
         }
+        Timer { id: reminderCloseTimer; interval: 1400; onTriggered: reminderWindow.hide() }
         Timer { id: rememberPosition; interval: 300; onTriggered: if(reminderWindow.visible && !reminderWindow.entering) reminderWindow.savePosition() }
         ParallelAnimation {
             id: reminderEntrance
             NumberAnimation { target: reminderWindow; property: "opacity"; from: 0; to: 1; duration: 240; easing.type: Easing.OutCubic }
             NumberAnimation { target: reminderWindow; property: "y"; from: reminderWindow.entranceY; to: reminderWindow.destinationY; duration: 280; easing.type: Easing.OutCubic }
         }
+        Rectangle {
+            objectName: "reminderEntryConfirmation"
+            parent: reminderWindow.contentItem
+            anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 24
+            z: 20; width: parent.width-48; height: feedbackText.implicitHeight+24
+            visible: reminderWindow.logging && !!reminderWindow.feedback
+            radius: 8; color: Theme.dark ? "#194b35" : "#edfaef"; border.color: Theme.dark ? "#3e7953" : "#a6d7b0"
+            Text { id: feedbackText; anchors.centerIn: parent; width: parent.width-24; text: reminderWindow.feedback; color: Theme.ink; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter; font.pixelSize: 13 }
+        }
+        onClosing: function(close) { if(logging && backend.state.busy) close.accepted=false }
         Rectangle {
             anchors.fill: parent; radius: 14; color: Theme.surface; border.color: Theme.line
             ColumnLayout {
@@ -488,14 +525,48 @@ ApplicationWindow {
                         MouseArea { objectName: "reminderDragHandle"; anchors.fill: parent; hoverEnabled: true; cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor; onPressed: reminderWindow.beginDrag() }
                     }
                 }
-                PunchClock { id: reminderDial; objectName: "reminderPunchClock"; Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 140; animate: reminderWindow.visible && !window.reducedMotion }
-                Text { Layout.fillWidth: true; text: "Time to log your hours"; horizontalAlignment: Text.AlignHCenter; color: Theme.ink; font.family: "IBM Plex Sans"; font.pixelSize: 20; font.bold: true }
-                Caption { Layout.fillWidth: true; text: "Add today's work to FreshBooks."; horizontalAlignment: Text.AlignHCenter }
                 RowLayout {
+                    visible: reminderWindow.logging
+                    Layout.fillWidth: true
+                    Text { text: "Log your day"; color: Theme.ink; font.pixelSize: 24; font.bold: true }
+                    Item { Layout.fillWidth: true }
+                    AppButton { objectName: "reminderEntryCancel"; text: "Cancel"; enabled: !backend.state.busy && !reminderWindow.completed; onClicked: reminderWindow.hide() }
+                }
+                ScrollView {
+                    id: reminderEntryScroll; objectName: "reminderEntryScroll"
+                    visible: reminderWindow.logging
+                    Layout.fillWidth: true; Layout.fillHeight: true
+                    clip: true; contentWidth: availableWidth
+                    ColumnLayout {
+                        width: reminderEntryScroll.availableWidth
+                        spacing: 12
+                        enabled: !reminderWindow.completed
+                        Card {
+                            Layout.fillWidth: true
+                            ColumnLayout {
+                                anchors.fill: parent; spacing: 5
+                                Text { text: "Business"; color: Theme.ink; font.pixelSize: 15; font.bold: true }
+                                Select { objectName: "reminderBusiness"; Layout.fillWidth: true; model: backend.state.businesses; currentIndex: backend.state.businessIndex; enabled: !backend.state.busy; onActivated: backend.selectBusiness(currentIndex) }
+                            }
+                        }
+                        Card {
+                            Layout.fillWidth: true
+                            EntryForm { anchors.fill: parent; scope: "reminder"; compact: true }
+                            Skeleton { anchors.fill: parent; active: backend.state.loading==="catalog" }
+                        }
+                        Text { Layout.fillWidth: true; visible: !backend.state.connected; text: "Connect FreshBooks in the main app's settings before logging time."; color: Theme.muted; wrapMode: Text.WordWrap }
+                        Text { objectName: "reminderEntryProblem"; Layout.fillWidth: true; visible: !!reminderWindow.problem; text: reminderWindow.problem; color: Theme.dark ? "#ff9da7" : "#b91c34"; wrapMode: Text.WordWrap; font.pixelSize: 13 }
+                    }
+                }
+                PunchClock { visible: !reminderWindow.logging; id: reminderDial; objectName: "reminderPunchClock"; Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 140; animate: reminderWindow.visible && !window.reducedMotion }
+                Text { visible: !reminderWindow.logging; Layout.fillWidth: true; text: "Time to log your hours"; horizontalAlignment: Text.AlignHCenter; color: Theme.ink; font.family: "IBM Plex Sans"; font.pixelSize: 20; font.bold: true }
+                Caption { visible: !reminderWindow.logging; Layout.fillWidth: true; text: "Add today's work to FreshBooks."; horizontalAlignment: Text.AlignHCenter }
+                RowLayout {
+                    visible: !reminderWindow.logging
                     Layout.fillWidth: true; Layout.topMargin: 10; spacing: 10
                     AppButton { objectName: "reminderLater"; text: "Dismiss"; Layout.fillWidth: true; Layout.preferredWidth: 1; onClicked: reminderWindow.hide() }
                     AppButton { objectName: "reminderAgain"; text: "Remind me"; Layout.fillWidth: true; Layout.preferredWidth: 1; tip: "Show again in " + backend.state.settings.remind_me_minutes + " minutes"; onClicked: if(backend.remindMe()) reminderWindow.hide() }
-                    AppButton { objectName: "reminderLog"; text: "Log hours"; primary: true; glyph: "check"; Layout.fillWidth: true; Layout.preferredWidth: 1; onClicked: { reminderWindow.hide(); backend.logFromReminder() } }
+                    AppButton { objectName: "reminderLog"; text: "Log hours"; enabled: !backend.state.busy; primary: true; glyph: "check"; Layout.fillWidth: true; Layout.preferredWidth: 1; onClicked: reminderWindow.openEntry() }
                 }
             }
         }

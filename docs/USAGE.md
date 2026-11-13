@@ -32,12 +32,14 @@ In Preferences, enable the daily reminder, select a local time and AM/PM, and ch
 
 ![FreshTray reminder popup](images/reminder.png)
 
-- **Log hours** opens the entry form.
+- **Log hours** turns the reminder into a one-use entry form with business, client, project/service, date, hours, notes and billable status. Its draft is separate from the main window. A successful save shows a brief confirmation, starts background sync and closes only the popup. Offline changes are saved locally for reconnection; validation or storage errors keep the form open. Cancel closes without saving.
 - **Remind me** schedules another popup using **Popup “Remind me” timer** in Preferences (1–1440 minutes). It does not change the daily reminder time. The timer survives an app restart.
 - **Dismiss** dismisses this popup without scheduling another.
 - Drag the dotted handle to move the popup. Its location is remembered and kept within the available desktop.
 
 The punchcard animates; the clock hands show the PC's local time when the popup opens. Windows reduced-motion settings reduce animation. In Sound options, choose separate sounds for **Main popup** and **Remind me**, use **Play** to preview, or switch off Popup sounds. The volume slider changes only FreshTray's popup sounds; system mute and volume still apply. Enable **Repeat** to loop the selected sound while either reminder popup is open. Dismiss, Remind me, and Log hours stop playback; previews play once.
+
+![One-use reminder entry form with fictional sample data](images/reminder-entry.png)
 
 ### Windows notifications and timing
 

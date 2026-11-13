@@ -46,6 +46,7 @@ class Controller(QObject):
     toast = Signal(str)
     error = Signal(str)
     reminder = Signal()
+    entrySaved = Signal(str, str)
     fitRequested = Signal()
     confirmation = Signal(str, str)
     calendarChanged = Signal()
@@ -78,7 +79,7 @@ class Controller(QObject):
         self.month, self.selected = date.today().replace(day=1), date.today()
         self.month_loaded, self.month_valid = None, False
         self.forms, self.baselines, self.originals = {}, {}, {}
-        for scope in ('log', 'month', 'timer'):
+        for scope in ('log', 'month', 'timer', 'reminder'):
             self.reset_form(scope)
         self.attempt = None
         self.pending_action = None
@@ -136,7 +137,7 @@ class Controller(QObject):
 
     @Property('QVariantMap', notify=changed)
     def state(self):
-        return dict(self._s, log=self.form_view('log'), monthForm=self.form_view('month'), timerForm=self.form_view('timer'),
+        return dict(self._s, log=self.form_view('log'), monthForm=self.form_view('month'), timerForm=self.form_view('timer'), reminderForm=self.form_view('reminder'),
                     sync=self.offline.status() if self.offline else dict(online=True, count=0, problems=[], message=''), syncing=self.syncing, legacyPending=self.offline.legacy_pending() if self.offline else bool(self.vault.get('pending')))
 
     @Property('QVariantList', notify=calendarChanged)
@@ -644,6 +645,7 @@ class Controller(QObject):
                                     ' · ' + format_duration(payload['time_entry']['duration']) + ' hours')
                 if self._s['panel'] == 'month':
                     self.load_month()
+                self.entrySaved.emit(scope, format_duration(payload['time_entry']['duration']))
             work = (lambda: self.api.update_entry(bid, original['id'], payload, original)) if original else lambda: self.api.submit(bid, payload)
             self.run('save', work, saved)
         previous = self.vault.get('last_success')
@@ -1004,9 +1006,21 @@ class Controller(QObject):
             if not delayed:
                 self.deliver_reminder()
 
-    @Slot()
+    @Slot(result=bool)
     def logFromReminder(self):
-        self.show_panel('log')
+        if self._s['busy']:
+            self.error.emit('Wait for the current operation to finish, then try again.')
+            return False
+        self.popup_chime.stop()
+        self.reset_form('reminder')
+        self.emit()
+        return True
+
+    @Slot()
+    def clearReminderEntry(self):
+        if not self._s['busy']:
+            self.reset_form('reminder')
+            self.emit()
 
     @Slot()
     def closeRequested(self):

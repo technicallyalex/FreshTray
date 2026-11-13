@@ -273,7 +273,9 @@ with tempfile.TemporaryDirectory() as d:
     before_sound=sum(call.args[0] is not None for call in sound_mock.call_args_list)
     b.testReminder();pump(.4)
     assert sum(call.args[0] is not None for call in sound_mock.call_args_list)==before_sound
-    reminder.hide();b.logFromReminder();pump(.1);assert w.isVisible()
+    assert b.logFromReminder();pump(.1);assert not w.isVisible()
+    assert b.state['reminderForm']['editing'] is False
+    reminder.hide()
     assert not errors,errors
     b.executor.shutdown(wait=True)
     w.hide();e.deleteLater();QCoreApplication.sendPostedEvents(None,QEvent.DeferredDelete);pump(.05)

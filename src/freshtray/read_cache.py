@@ -35,6 +35,8 @@ class ReadCache:
         return self.read(('month',str(business),month.isoformat(),str(identity)),lambda:self.backend.entries_for_month(business,month,identity),300)
     def submit(self,*args):
         self.clear('month');return self.backend.submit(*args)
+    def submit_timer(self,*args):
+        self.clear('month');return self.backend.submit_timer(*args)
     def update_entry(self,*args):
         self.clear('month');return self.backend.update_entry(*args)
     def delete_entry(self,*args):

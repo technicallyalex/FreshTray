@@ -13,7 +13,7 @@ import sys
 import time
 
 from PySide6.QtCore import QObject, Property, Signal, Slot, QTimer, Qt, QUrl, QPoint
-from PySide6.QtGui import QDesktopServices, QIcon
+from PySide6.QtGui import QDesktopServices, QIcon, QWindow
 from PySide6.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QMessageBox
 
 from .api import ApiError, OAuthAttempt, DEFAULT_REDIRECT
@@ -31,6 +31,8 @@ from .qt_updates import UpdateManager
 from . import updates
 from .windows import startup_enabled, set_startup
 from .work_timer import WorkTimer
+from .local_provider import LocalProvider
+from .qt_invoices import Invoices
 
 
 def ident(item):
@@ -51,15 +53,22 @@ class Controller(QObject):
     confirmation = Signal(str, str)
     calendarChanged = Signal()
     preferencesChanged = Signal()
+    uiScheduleChanged = Signal()
+    settingsFitRequested = Signal()
+    windowPlacementRequested = Signal()
 
     def __init__(self, api, vault, prefs, assets, launcher, demo=False, tray=True):
         super().__init__()
-        self._updater = UpdateManager(prefs,demo,self)
+        self.remote_api = api
+        self.local_mode = not demo and bool(prefs.data.get('standalone', not api.connected))
+        if self.local_mode: api = LocalProvider(vault)
+        self._updater = UpdateManager(prefs,demo or self.local_mode,self)
+        self._updater.offline_mode=self.local_mode
         self._updater.installRequested.connect(self.install_downloaded_update)
         self._updater.prepared.connect(self.restart_for_update)
         self._updater.preparationFailed.connect(self.update_preparation_failed)
         self._installing = False
-        self.offline = None if demo else OfflineAPI(api, vault, Vault(vault.path.parent/'offline.dpapi'))
+        self.offline = None if demo or self.local_mode else OfflineAPI(api, vault, Vault(vault.path.parent/'offline.dpapi'))
         if self.offline and hasattr(api.transport, 'timeout'):
             api.transport.timeout = 8
         self.api, self.vault, self.prefs = self.offline or ReadCache(api), vault, prefs
@@ -70,6 +79,14 @@ class Controller(QObject):
         self.choices = ChoiceHistory(vault)
         self.popup_chime = PopupChime(self.assets/'sounds/reminder.wav')
         self.window = None
+        self._resize_state=None
+        self._resize_tick=QTimer(self);self._resize_tick.setInterval(16);self._resize_tick.timeout.connect(self._advance_window_resize)
+        self._settings_fit=QTimer(self);self._settings_fit.setSingleShot(True);self._settings_fit.setInterval(30)
+        self._settings_fit.timeout.connect(self._deliver_settings_fit)
+        self._position_save=QTimer(self);self._position_save.setSingleShot(True);self._position_save.setInterval(350)
+        self._position_save.timeout.connect(self.rememberWindowPosition)
+        self._initial_placement=QTimer(self);self._initial_placement.setSingleShot(True);self._initial_placement.setInterval(0)
+        self._initial_placement.timeout.connect(self.windowPlacementRequested)
         self.screen_geometry = None
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='FreshTrayAPI')
         self.local_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='FreshTrayLocal')
@@ -85,7 +102,7 @@ class Controller(QObject):
         self.pending_action = None
         self.last_delivered = ''
         self.reminder_is_followup = False
-        self._s = dict(panel='log' if api.connected else 'settings', busy=False, loading='',
+        self._s = dict(panel='invoices' if self.local_mode else 'log' if api.connected else 'settings', busy=False, loading='',
                        connected=bool(api.connected), catalogReady=False, demo=demo, version=__version__,
                        businesses=[], businessIndex=-1, clients=[], calendar=[], weeks=[],
                        entries=[], entryPage=0, dayTotal='0:00', monthTotal='0:00',
@@ -95,6 +112,7 @@ class Controller(QObject):
                        clientId=(vault.get('credentials') or {}).get('client_id', ''),
                        redirect=(vault.get('credentials') or {}).get('redirect_uri', DEFAULT_REDIRECT), authStarted=False)
         self.work_timer = WorkTimer(self)
+        self._invoices = Invoices(self)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.poll)
         self.timer.start(25)
@@ -113,6 +131,7 @@ class Controller(QObject):
             for title, callback in [('Log time', lambda: self.show_panel('log')),
                                     ('Monthly hours', lambda: self.show_panel('month')),
                                     ('Timer', lambda: self.show_panel('timer')),
+                                    ('Invoices', lambda: self.show_panel('invoices')),
                                     ('Settings', lambda: self.show_panel('settings')),
                                     ('Test reminder', self.testReminder), ('Quit FreshTray', self.requestQuit)]:
                 menu.addAction(title, callback)
@@ -128,6 +147,10 @@ class Controller(QObject):
         self.rebuild_calendar()
 
     @Property(QObject, constant=True)
+    def invoices(self):
+        return self._invoices
+
+    @Property(QObject, constant=True)
     def workTimer(self):
         return self.work_timer
 
@@ -137,7 +160,7 @@ class Controller(QObject):
 
     @Property('QVariantMap', notify=changed)
     def state(self):
-        return dict(self._s, log=self.form_view('log'), monthForm=self.form_view('month'), timerForm=self.form_view('timer'), reminderForm=self.form_view('reminder'),
+        return dict(self._s, localMode=self.local_mode, log=self.form_view('log'), monthForm=self.form_view('month'), timerForm=self.form_view('timer'), reminderForm=self.form_view('reminder'),
                     sync=self.offline.status() if self.offline else dict(online=True, count=0, problems=[], message=''), syncing=self.syncing, legacyPending=self.offline.legacy_pending() if self.offline else bool(self.vault.get('pending')))
 
     @Property('QVariantList', notify=calendarChanged)
@@ -158,6 +181,86 @@ class Controller(QObject):
             return self.screen_geometry()
         rect = screen.availableGeometry()
         return dict(x=rect.x(), y=rect.y(), width=rect.width(), height=rect.height())
+
+    @Property(bool,notify=uiScheduleChanged)
+    def settingsFitPending(self):return self._settings_fit.isActive()
+
+    @Slot()
+    def scheduleSettingsFit(self):
+        self._settings_fit.start();self.uiScheduleChanged.emit()
+
+    def _deliver_settings_fit(self):
+        if self._resize_tick.isActive():
+            self._settings_fit.start();return
+        self.uiScheduleChanged.emit();self.settingsFitRequested.emit()
+
+    @Slot()
+    def schedulePositionSave(self):self._position_save.start()
+
+    @Slot()
+    def scheduleWindowPlacement(self):self._initial_placement.start()
+
+    @Property(bool,notify=uiScheduleChanged)
+    def resizeAnimating(self):return self._resize_tick.isActive()
+
+    @Slot()
+    def cancelWindowResize(self):
+        self._resize_tick.stop();self._resize_state=None;self.uiScheduleChanged.emit()
+
+    @Slot(int,int,float,float,bool,result=bool)
+    def resizeMainWindow(self,width,height,cx,cy,animate):
+        if not self.window:return False
+        target=(width,height)
+        if self._resize_state and self._resize_state['target']==target and self._resize_tick.isActive():return True
+        start=(self.window.width(),self.window.height())
+        self._resize_state=dict(start=start,target=target,center=(cx,cy),time=time.monotonic(),duration=.24 if animate and start!=target else 0)
+        if self._resize_state['duration']:
+            self._resize_tick.start();self.uiScheduleChanged.emit()
+        self._advance_window_resize()
+        return True
+
+    def _advance_window_resize(self):
+        state=self._resize_state
+        if not state or not self.window:self._resize_tick.stop();return
+        if self.window.visibility() in (QWindow.Visibility.Maximized,QWindow.Visibility.FullScreen,QWindow.Visibility.Minimized):
+            self.cancelWindowResize();return
+        t=min(1,(time.monotonic()-state['time'])/state['duration']) if state['duration'] else 1
+        eased=4*t*t*t if t<.5 else 1-(-2*t+2)**3/2
+        width,height=(round(a+(b-a)*eased) for a,b in zip(state['start'],state['target']))
+        self.window.resize(width,height)
+        area=self.windowBounds()
+        x,y=state['center'][0]-self.window.width()/2,state['center'][1]-self.window.height()/2
+        if self.prefs.data.get('docked_mode'):x,y=area['x']+area['width']-self.window.width()-8,area['y']+area['height']-self.window.height()-8
+        self.window.setX(round(max(area['x'],min(x,area['x']+max(0,area['width']-self.window.width())))))
+        self.window.setY(round(max(area['y'],min(y,area['y']+max(0,area['height']-self.window.height())))))
+        if t>=1:
+            self._resize_tick.stop();self._resize_state=None;self.uiScheduleChanged.emit();self.schedulePositionSave()
+
+    @Slot(int,int,result='QVariantMap')
+    def initialWindowPlacement(self,width,height):
+        saved=self.prefs.data.get('window_position')
+        valid=isinstance(saved,dict) and all(isinstance(saved.get(k),(int,float)) and not isinstance(saved.get(k),bool) and abs(saved[k])<1000000 for k in ('x','y'))
+        screens=QApplication.screens();screen=QApplication.primaryScreen()
+        if valid:
+            screen=next((s for s in screens if s.availableGeometry().contains(int(saved['x']),int(saved['y']))),screen)
+        if self.window and screen:self.window.setScreen(screen)
+        area=self.windowBounds()
+        if self.prefs.data.get('docked_mode'):
+            x=area['x']+area['width']-width-8;y=area['y']+area['height']-height-8
+        elif valid and (self.screen_geometry or any(s.availableGeometry().contains(int(saved['x']),int(saved['y'])) for s in screens)):
+            x=saved['x'];y=saved['y']
+        else:
+            x=area['x']+(area['width']-width)/2;y=area['y']+(area['height']-height)/2
+        return dict(x=round(max(area['x'],min(x,area['x']+max(0,area['width']-width)))),y=round(max(area['y'],min(y,area['y']+max(0,area['height']-height)))),bounds=area)
+
+    @Slot()
+    def rememberWindowPosition(self):
+        if self._resize_tick.isActive():return
+        if not self.window or not self.window.isVisible() or self.window.visibility() in (QWindow.Visibility.Maximized,QWindow.Visibility.FullScreen,QWindow.Visibility.Minimized) or self.prefs.data.get('docked_mode'):return
+        position=dict(x=self.window.x(),y=self.window.y())
+        if self.prefs.data.get('window_position')!=position:
+            try:self.prefs.save(window_position=position)
+            except OSError:pass
 
     @Slot(int, int, result='QVariantMap')
     def reminderPlacement(self, preferred_width, preferred_height):
@@ -345,6 +448,7 @@ class Controller(QObject):
                     continue
                 self.reset_form(scope, self.selected if scope == 'month' else None)
             self.work_timer.recover_submission()
+            self._invoices.activate()
             self.rebuild_calendar()
             if self._s['panel'] == 'month':
                 self.load_month()
@@ -362,6 +466,8 @@ class Controller(QObject):
 
     @Slot(int)
     def selectBusiness(self, index):
+        if self._invoices.busy:
+            self.error.emit('Wait for invoice work to finish before changing business.');return
         if self.work_timer.status != 'idle':
             self.error.emit('Log or discard the current timer before changing business.')
             return
@@ -375,18 +481,25 @@ class Controller(QObject):
 
     @Slot(str)
     def selectPanel(self, panel):
-        if panel not in ('log', 'month', 'settings', 'timer'):
+        if panel not in ('log', 'month', 'settings', 'timer', 'invoices', 'clients', 'estimates'):
             return
         self._s['panel'] = panel
+        if panel == 'invoices': self._invoices.activate()
         if panel == 'month' and self.business and not self._s['busy']:
             self.load_month()
         self.emit()
         self.fitRequested.emit()
 
+    @Slot()
+    def confirmBillingSync(self):
+        self.confirm('Apply the pending billing changes to the selected FreshBooks business?',
+                     self._invoices.billingTools.sync)
+
     def show_panel(self, panel):
-        self.selectPanel(panel)
         if self.window:
             self.window.showNormal()
+        self.selectPanel(panel)
+        if self.window:
             self.window.raise_()
             self.window.requestActivate()
 
@@ -562,7 +675,7 @@ class Controller(QObject):
         self.rebuild_calendar()
         if self.offline:
             self.request_sync()
-        else:
+        elif not self.local_mode:
             self.toast.emit('Preview entry deleted' if self.demo else 'Time entry deleted')
         if self._s['panel'] == 'month':
             self.load_month(force=True)
@@ -640,7 +753,7 @@ class Controller(QObject):
                     self.rebuild_calendar()
                 if self.offline:
                     self.request_sync()
-                else:
+                elif not self.local_mode:
                     self.toast.emit(('Preview saved locally' if self.demo else 'Changes saved' if original else 'Time logged') +
                                     ' · ' + format_duration(payload['time_entry']['duration']) + ' hours')
                 if self._s['panel'] == 'month':
@@ -648,7 +761,7 @@ class Controller(QObject):
                 self.entrySaved.emit(scope, format_duration(payload['time_entry']['duration']))
             work = (lambda: self.api.update_entry(bid, original['id'], payload, original)) if original else lambda: self.api.submit(bid, payload)
             self.run('save', work, saved)
-        previous = self.vault.get('last_success')
+        previous = self.api.local_last_success if self.local_mode else self.vault.get('last_success')
         queued_duplicate = self.offline and any(o['kind'] == 'create' and str(o['business']) == str(bid) and o['payload'] == payload for o in self.offline.data['outbox'])
         if not original and queued_duplicate:
             self.confirm('This exact entry is already waiting to sync. Add another copy?', save)
@@ -712,15 +825,16 @@ class Controller(QObject):
         self.fitRequested.emit()
 
     @Slot(str, str, str)
-    def beginConnect(self, client_id, secret, redirect):
+    def beginConnect(self, client_id, secret, redirect, invoice_access=False):
         if self.demo:
             self.error.emit('Offline preview does not connect to FreshBooks.')
             return
-        if self._s['busy']:
+        if self._s['busy'] or self._invoices.busy or self.work_timer.status != 'idle':
+            self.error.emit('Finish the current operation or timer before connecting.')
             return
         try:
             credentials = dict(client_id=client_id.strip(), client_secret=secret or
-                               (self.vault.get('credentials') or {}).get('client_secret', ''), redirect_uri=redirect.strip())
+                               (self.vault.get('credentials') or {}).get('client_secret', ''), redirect_uri=redirect.strip(), invoice_access=invoice_access)
             self.attempt = OAuthAttempt(credentials)
             if not QDesktopServices.openUrl(QUrl(self.attempt.url())):
                 raise ValueError('Your browser could not open. Check your default browser and try again.')
@@ -729,6 +843,54 @@ class Controller(QObject):
             self.toast.emit('Sign in, then paste the complete return URL below')
         except ValueError as exc:
             self.error.emit(str(exc))
+
+    @Slot()
+    def traceWizardOpening(self):
+        try:
+            if not hasattr(self,'_wizard_trace'):
+                from .wizard_trace import WizardTrace
+                self._wizard_trace=WizardTrace(self)
+            self._wizard_trace.arm()
+        except OSError:pass
+
+    @Slot(str, str, str)
+    def beginBillingConnect(self, client_id, secret, redirect):
+        self.beginConnect(client_id, secret, redirect, True)
+
+    @Slot()
+    def openDeveloperPortal(self):
+        QDesktopServices.openUrl(QUrl('https://my.freshbooks.com/#/developer'))
+
+    @Slot(str)
+    def copySetup(self, field):
+        from .api import SCOPES, INVOICE_SCOPES
+        QApplication.clipboard().setText(DEFAULT_REDIRECT if field=='redirect' else SCOPES+' '+INVOICE_SCOPES)
+
+    def _activate_mode(self, local):
+        self.local_mode=local
+        self.prefs.save(standalone=local)
+        self.offline=None if local else OfflineAPI(self.remote_api,self.vault,Vault(self.vault.path.parent/'offline.dpapi'))
+        self.api=ReadCache(LocalProvider(self.vault)) if local else self.offline
+        self._updater.start_timer.stop();self._updater.demo=self.demo or local;self._updater.offline_mode=local
+        self._updater.portable=bool(getattr(sys,'frozen',False) and not self.demo and not local)
+        self.business=None;self.profile={};self.businesses=[];self.clients=[];self.projects=[];self.services=[];self.entries=[]
+        self._s.update(connected=True if local else self.remote_api.connected,catalogReady=False,monthReady=False,businesses=[],clients=[],businessIndex=-1)
+        for scope in self.forms:self.reset_form(scope)
+        self.month_loaded=None;self.month_valid=False
+        self._invoices.activate();self.emit()
+
+    @Slot(bool)
+    def useLocalMode(self, local):
+        if local==self.local_mode:return
+        if self._s['busy'] or self.syncing or self._invoices.busy or self.work_timer.status!='idle' or self._updater.state['phase'] in ('downloading','preparing'):
+            self.error.emit('Finish the current operation or timer before switching workspaces.');return
+        def switch():
+            self._invoices.persist_draft();self._activate_mode(local)
+            if local or self.remote_api.connected:self.load_profile()
+            self._s['connectionSection']=True
+            self.show_panel('settings')
+        if any(self.dirty(scope) for scope in self.forms):self.confirm('Switch workspace and discard unsaved time-entry drafts? Invoice drafts are retained separately.',switch)
+        else:switch()
 
     @Slot()
     def cancelConnect(self):
@@ -747,9 +909,10 @@ class Controller(QObject):
                 self.attempt = None
                 self._s['authStarted'] = False
                 self._s.update(connected=True, clientId=(self.vault.get('credentials') or {}).get('client_id', ''))
+                if self.local_mode:self._activate_mode(False)
                 self.toast.emit('Connected to FreshBooks')
                 self.load_profile()
-            self.run('connect', lambda: self.api.connect(self.attempt, returned), done)
+            self.run('connect', lambda: self.remote_api.connect(self.attempt, returned) if self.local_mode else self.api.connect(self.attempt, returned), done)
         if any(self.dirty(s) or self.originals[s] for s in self.forms):
             self.confirm('Reconnecting will discard unsaved entry drafts after sign-in succeeds.', connect)
         else:
@@ -772,6 +935,8 @@ class Controller(QObject):
                     self.reset_form(scope)
                 self.rebuild_calendar()
                 self.toast.emit('Disconnected')
+            if self.local_mode:
+                self.error.emit('Standalone mode has no FreshBooks connection to disconnect.');return
             self.run('connect', self.api.disconnect, done)
         self.confirm('Disconnect FreshTray from FreshBooks? Saved credentials and downloaded account data will be removed from this PC after disconnection succeeds. Entries already saved in FreshBooks stay unchanged. Unsaved drafts will be discarded.', revoke)
 
@@ -927,11 +1092,17 @@ class Controller(QObject):
 
     def apply_window_flags(self):
         if self.window:
-            visible = self.window.isVisible()
-            self.window.setFlag(Qt.WindowStaysOnTopHint, bool(self.prefs.data['always_on_top'] or self.prefs.data['docked_mode']))
-            self.window.setFlag(Qt.Tool, bool(self.prefs.data['docked_mode']))
-            if visible:
-                self.window.show()
+            state = self.window.visibility()
+            docked = self.prefs.data['docked_mode']
+            flags = (self.window.flags() & ~Qt.WindowType_Mask) | (Qt.Tool if docked else Qt.Window)
+            if self.prefs.data['always_on_top'] or docked:
+                flags |= Qt.WindowStaysOnTopHint
+            else:
+                flags &= ~Qt.WindowStaysOnTopHint
+            if flags != self.window.flags():
+                self.window.setFlags(flags)
+                if state != QWindow.Visibility.Hidden:
+                    self.window.setVisibility(state)
 
     @Slot()
     def testReminder(self):
@@ -1024,6 +1195,7 @@ class Controller(QObject):
 
     @Slot()
     def closeRequested(self):
+        self.rememberWindowPosition()
         if self.prefs.data.get('close_to_tray', True) and self.tray and self.tray.isSystemTrayAvailable():
             if self.window:
                 self.window.hide()
@@ -1032,6 +1204,8 @@ class Controller(QObject):
 
     @Slot()
     def requestQuit(self):
+        if self._invoices.busy:
+            self.error.emit('Wait for invoice work to finish before quitting.');return
         if self._s['busy']:
             self.error.emit('Wait for the current operation to finish before quitting.')
             if self.window:
@@ -1048,7 +1222,7 @@ class Controller(QObject):
         if not self._updater.portable:
             self._updater.install_error('Automatic installation is available in the portable executable.')
             return
-        if self._s['busy'] or self.syncing or any(self.dirty(scope) for scope in self.forms):
+        if self._s['busy'] or self.syncing or self._invoices.busy or self._invoices.draft or any(self.dirty(scope) for scope in self.forms):
             self._updater.install_error('Save or discard entry drafts and wait for any current operation to finish before installing.')
             return
         self._installing=True
@@ -1074,7 +1248,11 @@ class Controller(QObject):
         self.shutdown()
 
     def shutdown(self):
+        self.rememberWindowPosition()
+        if not self._invoices.close():
+            self.show_panel('invoices');return
         self.work_timer.persist()
+        self.cancelWindowResize();self._settings_fit.stop();self._position_save.stop();self._initial_placement.stop()
         self.work_timer.ui.stop(); self.work_timer.checkpoint.stop()
         self.work_timer.draft_save.stop()
         self._updater.close()

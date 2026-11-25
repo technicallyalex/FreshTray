@@ -14,6 +14,8 @@ from . import __version__
 
 API = "https://api.freshbooks.com"
 SCOPES = "user:profile:read user:clients:read user:projects:read user:billable_items:read user:time_entries:read user:time_entries:write"
+INVOICE_SCOPES = ("user:invoices:read user:invoices:write user:expenses:read user:business:read user:uploads:read "
+                  "user:clients:write user:estimates:read user:estimates:write user:payments:read user:payments:write")
 DEFAULT_REDIRECT = "https://localhost:8765/callback"
 
 
@@ -32,6 +34,19 @@ class Transport:
     def __init__(self):
         self.opener = build_opener(NoRedirect())
         self.timeout = 25
+
+    def image(self,path,token):
+        target=urlsplit(path)
+        if target.scheme or target.netloc or not path.startswith('/uploads/images/'):
+            raise ValueError('Unsupported FreshBooks logo location.')
+        try:
+            request=Request(API+path,headers={'Authorization':'Bearer '+token,'Accept':'image/*'})
+            with self.opener.open(request,timeout=self.timeout) as response:
+                data=response.read(10*1024*1024+1)
+                if len(data)>10*1024*1024:raise ValueError('Logo exceeds 10 MB.')
+                return data
+        except (HTTPError,URLError,TimeoutError,OSError):
+            raise ApiError('Business logo could not be downloaded. The previously saved logo is still available.') from None
 
     def __call__(self, method, path, body=None, token=None):
         headers = {"Accept": "application/json", "User-Agent": "FreshTray/" + __version__}
@@ -79,7 +94,7 @@ class OAuthAttempt:
     def url(self):
         return "https://auth.freshbooks.com/oauth/authorize/?" + urlencode({
             "response_type": "code", "client_id": self.credentials["client_id"],
-            "redirect_uri": self.credentials["redirect_uri"], "state": self.state, "scope": SCOPES})
+            "redirect_uri": self.credentials["redirect_uri"], "state": self.state, "scope": SCOPES + (" " + INVOICE_SCOPES if self.credentials.get("invoice_access") else "")})
 
     def consume(self, returned_url):
         if self.consumed or time.monotonic() - self.created > 300:
@@ -127,7 +142,7 @@ class FreshBooks:
             credentials = attempt.credentials
             # Persist the user-provided app secret only in the DPAPI vault.
             self.vault.update(credentials=credentials, tokens=None, refresh_inflight=True)
-            result = self.transport("POST", "/auth/oauth/token", dict(credentials, code=code, grant_type="authorization_code"))
+            result = self.transport("POST", "/auth/oauth/token", dict({k:credentials[k] for k in ("client_id","client_secret","redirect_uri")}, code=code, grant_type="authorization_code"))
             self._save_tokens(result)
 
     def _token(self):
@@ -139,7 +154,7 @@ class FreshBooks:
         # Refresh is one-use. A crash/timeout must not reuse the previous token.
         self.vault.update(refresh_inflight=True)
         credentials = self.vault.get("credentials")
-        result = self.transport("POST", "/auth/oauth/token", dict(credentials, grant_type="refresh_token", refresh_token=pair["refresh_token"]))
+        result = self.transport("POST", "/auth/oauth/token", dict({k:credentials[k] for k in ("client_id","client_secret","redirect_uri")}, grant_type="refresh_token", refresh_token=pair["refresh_token"]))
         self._save_tokens(result)
         return self.vault.get("tokens")["access_token"]
 
@@ -152,6 +167,9 @@ class FreshBooks:
     def profile(self):
         return self.request("GET", "/auth/api/v1/users/me")["response"]
 
+    def image(self,path):
+        with self.lock:return self.transport.image(path,self._token())
+
     def pages(self, path, key, accounting=False):
         result, seen = [], set()
         for page in range(1, 1001):
@@ -161,7 +179,11 @@ class FreshBooks:
             items = root[key]
             meta = root if accounting else root.get("meta", {})
             for item in items:
-                ident = item.get("id", item.get("userid"))
+                ident = next((item[k] for k in ("id", "userid", "estimateid", "paymentid", "logid")
+                              if item.get(k) is not None), None)
+                if ident is None:
+                    result.append(item)
+                    continue
                 if ident not in seen:
                     result.append(item)
                     seen.add(ident)

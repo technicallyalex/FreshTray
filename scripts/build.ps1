@@ -10,5 +10,7 @@ Push-Location -LiteralPath $projectPath
 try {
     & $pythonPath -m PyInstaller --noconfirm --clean --distpath $outputPath --workpath (Join-Path $projectPath '.build\pyinstaller') (Join-Path $PSScriptRoot 'FreshTray.spec')
     if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
+    & $pythonPath (Join-Path $PSScriptRoot 'check_packaged_sources.py') (Join-Path $outputPath 'FreshTray.exe')
+    if ($LASTEXITCODE -ne 0) { throw 'Packaged code did not match the source. Do not distribute this executable.' }
     Write-Host "Ready: $outputPath\FreshTray.exe. This is a self-contained single-file application."
 } finally { Pop-Location }

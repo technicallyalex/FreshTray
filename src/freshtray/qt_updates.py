@@ -58,6 +58,8 @@ class UpdateManager(QObject):
     @Slot()
     def checkUpdates(self):self.check(True)
     def check(self,manual=True):
+        if getattr(self,'offline_mode',False):
+            self.put(phase='idle',message='Update checks are disabled in standalone mode.',visible=manual);return
         if self.closed or self._state['phase'] in ('checking','downloading','preparing'):return
         if self._state['phase']=='ready':
             self.put(visible=True);self.prompt.emit();return
@@ -70,6 +72,7 @@ class UpdateManager(QObject):
         self.job('check',lambda:updates.latest_release(__version__))
     @Slot()
     def downloadUpdate(self):
+        if getattr(self,'offline_mode',False):return
         if not self.release or self._state['phase'] not in ('available','error'):return
         self.cancel.clear();self.put(phase='downloading',message='Downloading and verifying…',progress=0)
         self.job('download',lambda:updates.download(self.release,updates.staging_root(),self.cancel,lambda p:self.results.put(('progress',p))))

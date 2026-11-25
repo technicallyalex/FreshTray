@@ -1,3 +1,14 @@
+# 0.4 RC1 verification
+
+[0.2 remains the recommended stable release](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2).
+
+- 157 unit tests and 32 invoice and wizard layout cases passed. Native checks covered centered resizing, interruption, and restoring a minimized window.
+- The packaged EXE passed offline client management, estimate PDF export and linked conversion, and payment history and corrections. It verified that the main Clients tab is visible and that the duplicate buttons are gone.
+- The same EXE completed live FreshBooks reads for clients, invoices, estimates, account payment history, and payments on a real invoice. No API errors or write attempts occurred.
+- Connected write behavior was tested with fixtures covering offline queues, conflicts and ambiguous responses. Live provider writes were outside this test.
+
+---
+
 # 0.3 RC3 verification
 
 This release candidate is for testing and issue reports. [0.2 remains the recommended stable release](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2).

@@ -43,11 +43,14 @@ class WorkTimer(QObject):
                 if key in controller.forms['timer'] and type(value) is type(controller.forms['timer'][key]):
                     controller.forms['timer'][key]=deepcopy(value)
         self.ui = QTimer(self); self.ui.timeout.connect(self.tick); self.ui.start(1000)
-        self.checkpoint = QTimer(self); self.checkpoint.timeout.connect(self.persist); self.checkpoint.start(10000)
+        self.checkpoint = QTimer(self); self.checkpoint.timeout.connect(self._checkpoint_running); self.checkpoint.start(10000)
         self.draft_save=QTimer(self);self.draft_save.setSingleShot(True);self.draft_save.timeout.connect(self.persist)
 
     def schedule_persist(self):
         self.draft_save.start(300)
+
+    def _checkpoint_running(self):
+        if self.status=='running':self.persist()
 
     def elapsed(self):
         return self.seconds + (max(0., time.monotonic()-self.anchor) if self.status == 'running' else 0)
@@ -214,24 +217,24 @@ class WorkTimer(QObject):
             # Persist the acknowledgement before exposing another Start button.
             request=self.request_id
             cleared=self.clear(); b.month_valid=False;b.month_loaded=None;b._s['monthReady']=False;b.next_sync=0
-            if cleared and b.offline:
-                try:b.offline.forget_timer_receipt(request)
+            if cleared and (b.offline or getattr(b,'local_mode',False)):
+                try:(b.offline or b.api).forget_timer_receipt(request)
                 except OSError:pass
             if b.offline:b.request_sync()
-            else:b.toast.emit('Timer logged')
+            elif not getattr(b,'local_mode',False):b.toast.emit('Timer logged')
             if b._s['panel']=='month':b.load_month(force=True)
-        def work():return b.offline.submit_timer(self.business_id,payload,self.request_id) if b.offline else b.api.submit(self.business_id,payload)
+        def work():return (b.offline or b.api).submit_timer(self.business_id,payload,self.request_id) if b.offline or getattr(b,'local_mode',False) else b.api.submit(self.business_id,payload)
         if not b.run('save',work,saved):self.saving=False;self.submission=None;self.persist();self.changed.emit()
 
     def recover_submission(self):
         if not self.submission:return
         b=self.owner
-        if b.offline and self.request_id:
-            state=b.offline.timer_submission_state(self.request_id)
+        if (b.offline or getattr(b,'local_mode',False)) and self.request_id:
+            state=(b.offline or b.api).timer_submission_state(self.request_id)
             if state in ('queued','saved'):
                 request=self.request_id
                 if self.clear():
-                    try:b.offline.forget_timer_receipt(request)
+                    try:(b.offline or b.api).forget_timer_receipt(request)
                     except OSError:pass
                 return
             # The durable outbox and receipt both lack this request, so no
@@ -247,7 +250,7 @@ class WorkTimer(QObject):
     def save_failed(self):
         if not self.saving:return
         self.saving=False
-        if self.owner.offline and self.request_id:
+        if (self.owner.offline or getattr(self.owner,'local_mode',False)) and self.request_id:
             self.recover_submission()
             if self.status=='idle':return
         # Retain uncertain submission guard; existing recovery UI owns reconciliation.

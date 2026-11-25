@@ -1,3 +1,16 @@
+# FreshTray 0.4 RC1 — billing testing prerelease
+
+**Use [0.2](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2) for everyday work. Try this candidate if you want to test billing or [report an issue](https://github.com/technicallyalex/FreshTray/issues).**
+
+- Browse, edit, and preview invoices. Import unbilled time and expenses, set an hourly rate in bulk, export PDFs, and prepare email drafts.
+- Manage clients from the **Clients** tab. Create estimates and convert them into linked invoice drafts. Record full or partial payments on invoices and review their history.
+- Use standalone billing offline or connect a FreshBooks business. **Settings → FreshBooks connection** contains the setup wizard and refresh controls. Billing access requires the new FreshBooks scopes and fresh consent.
+- Tabs keep a consistent size during panel changes. Undocked windows stay open when focus moves away. The timer and reminder features from the 0.3 candidates are included.
+
+See the [billing guide](INVOICES.md) and [QA results](RC_QA.md).
+
+---
+
 # FreshTray 0.3 RC3 — popup entry testing prerelease
 
 **For testing and reporting issues. Most users should stay on [0.2](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2). This is not the stable 0.3 release.**

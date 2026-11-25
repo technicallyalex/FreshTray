@@ -15,7 +15,7 @@ exe=release/f'FreshTray-{version}.exe'
 shutil.copy2(source,exe)
 archive=release/f'FreshTray-{version}-Windows-x64.zip'
 allowed=[root/'README.md',root/'LICENSE']
-allowed.extend(root/'docs'/name for name in ('SETUP.md','USAGE.md','SECURITY.md','DEVELOPING.md','RELEASE_NOTES.md','THIRD_PARTY_NOTICES.md','TIMER.md','RC_QA.md'))
+allowed.extend(root/'docs'/name for name in ('SETUP.md','USAGE.md','SECURITY.md','DEVELOPING.md','RELEASE_NOTES.md','THIRD_PARTY_NOTICES.md','TIMER.md','INVOICES.md','RC_QA.md'))
 allowed.extend(p for folder in ('docs/licenses','docs/images') for p in (root/folder).rglob('*') if p.is_file())
 with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:
     z.write(exe,exe.name)

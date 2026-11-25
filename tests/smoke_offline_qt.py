@@ -25,7 +25,7 @@ for font in (root/'src/assets/fonts').glob('*.ttf'): QFontDatabase.addApplicatio
 messages = []; qInstallMessageHandler(lambda kind, context, text: messages.append(text))
 def settle(b):
     deadline = time.monotonic()+8
-    while b.state['busy'] or b.syncing:
+    while b.state['busy'] or b.syncing or b.resizeAnimating or b.settingsFitPending:
         app.processEvents(); time.sleep(.01)
         assert time.monotonic()<deadline, 'UI did not settle'
     for _ in range(5): app.processEvents(); time.sleep(.01)
@@ -61,6 +61,7 @@ with tempfile.TemporaryDirectory() as folder:
     b.connectionSection(True)
     until=time.monotonic()+.5
     while time.monotonic()<until: app.processEvents(); time.sleep(.01)
+    settle(b)
     assert w.height()==connection_height, ('Connection height should be stable across tab changes',w.height(),connection_height,w.width())
     b._s['authStarted']=True; b.emit()
     until=time.monotonic()+.5

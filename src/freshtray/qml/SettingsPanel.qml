@@ -7,6 +7,7 @@ import QtQuick.Layouts
 Item {
 
     id: panel
+    signal setupRequested()
     implicitHeight: settingsLayout.implicitHeight
     readonly property real naturalHeight: settingsLayout.implicitHeight
 
@@ -31,7 +32,7 @@ Item {
     }
     ColumnLayout {
         id: settingsLayout
-        anchors.fill: parent; spacing: Theme.compact ? 4 : 12
+        anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; spacing: Theme.compact ? 4 : 12
 
     RowLayout {
         id: settingsTabs
@@ -45,7 +46,7 @@ Item {
 
         Item { Layout.fillWidth: true }
 
-        Caption { text: panel.s.connected ? (panel.s.sync.online===false ? "Offline" : "Account connected") : "Not connected"; color: panel.s.connected ? Theme.green : Theme.muted }
+        Caption { text: panel.s.localMode ? "Standalone workspace" : panel.s.connected ? (panel.s.sync.online===false ? "Offline" : "Account connected") : "Not connected"; color: panel.s.connected ? Theme.green : Theme.muted }
 
     }
 
@@ -281,9 +282,28 @@ Item {
 
                 anchors.fill: parent; spacing: 10
 
+                RowLayout {
+                    Layout.fillWidth: true; spacing: 12
+                    AppButton { text: "Connection setup wizard"; onClicked: panel.setupRequested() }
+                    Item { Layout.fillWidth: true }
+                    Switch {
+                id: standaloneToggle; objectName: "standaloneToggle"
+                text: "Standalone mode"; checked: panel.s.localMode
+                enabled: !panel.s.busy
+                implicitHeight: 32; implicitWidth: 210
+                onClicked: { backend.useLocalMode(checked); checked=Qt.binding(function() { return panel.s.localMode }) }
+                indicator: Rectangle {
+                    width: 40; height: 22; radius: 11; y: (parent.height-height)/2
+                    color: standaloneToggle.checked ? Theme.green : Theme.line
+                    Rectangle { x: standaloneToggle.checked ? 21 : 3; y: 3; width: 16; height: 16; radius: 8; color: "white" }
+                }
+                contentItem: Text { text: standaloneToggle.text; color: Theme.ink; font.pixelSize: 14; leftPadding: 50; verticalAlignment: Text.AlignVCenter }
+            }
+                }
+
                 Text { text: "Connect your FreshBooks app"; color: Theme.ink; font.pixelSize: 16; font.bold: true }
 
-                Text { Layout.fillWidth: true; text: "Use your own FreshBooks developer app. Its credentials and tokens are encrypted for your Windows account."; color: Theme.muted; font.pixelSize: 12; wrapMode: Text.WordWrap }
+                Text { Layout.fillWidth: true; text: panel.s.localMode ? "Standalone mode works without FreshBooks. Turn it off to use your connected account. Your local and connected records stay separate." : "Use your own FreshBooks developer app. Its credentials and tokens are encrypted for your Windows account."; color: Theme.muted; font.pixelSize: 12; wrapMode: Text.WordWrap }
 
                 ColumnLayout {
                     visible: !panel.s.authStarted
@@ -306,7 +326,7 @@ Item {
                         Caption { Layout.fillWidth: true; text: "Registered HTTPS redirect URI" }
                         Field { id: redirect; objectName: "oauthRedirect"; Layout.fillWidth: true; text: panel.s.redirect; enabled: !panel.s.busy; Accessible.name: "Registered redirect URI" }
                     }
-                    AppButton { objectName: "oauthSignIn"; Layout.alignment: Qt.AlignLeft; text: "Open browser sign-in"; enabled: !panel.s.busy && !panel.s.demo; onClicked: { backend.beginConnect(clientId.text,secret.text,redirect.text); secret.clear() } }
+                    AppButton { objectName: "oauthSignIn"; Layout.alignment: Qt.AlignLeft; text: "Open browser sign-in"; enabled: !panel.s.busy && !panel.s.demo; onClicked: { backend.beginBillingConnect(clientId.text,secret.text,redirect.text); secret.clear() } }
                 }
 
                 ColumnLayout {
@@ -340,7 +360,7 @@ Item {
             Layout.fillWidth: true; spacing: 12
             Layout.leftMargin: connectionCard.leftPadding; Layout.rightMargin: connectionCard.rightPadding
 
-            AppButton { objectName: "refreshAccountData"; text: "Refresh FreshBooks data"; enabled: panel.s.connected && !panel.s.busy; onClicked: backend.reloadCatalog() }
+            AppButton { objectName: "refreshAccountData"; text: panel.s.localMode ? "Refresh local lists" : "Refresh account lists"; enabled: panel.s.connected && !panel.s.busy && !backend.invoices.state.busy; onClicked: backend.reloadCatalog() }
 
             AppButton { visible: !!panel.s.legacyPending; text: "Check pending save"; enabled: panel.s.connected && !panel.s.busy; onClicked: backend.checkPending() }
 
@@ -350,8 +370,29 @@ Item {
 
             Item { Layout.fillWidth: true }
 
-            AppButton { objectName: "disconnectAccount"; text: "Disconnect"; destructive: true; enabled: panel.s.connected && !panel.s.busy && !panel.s.demo; onClicked: backend.disconnect() }
+            AppButton { objectName: "disconnectAccount"; text: "Disconnect"; destructive: true; enabled: panel.s.connected && !panel.s.localMode && !panel.s.busy && !panel.s.demo; onClicked: backend.disconnect() }
 
+        }
+
+        ColumnLayout {
+            visible: panel.s.connected && !panel.s.localMode && !panel.s.demo
+            Layout.fillWidth: true
+            Layout.leftMargin: connectionCard.leftPadding; Layout.rightMargin: connectionCard.rightPadding
+            enabled: !panel.s.busy && !backend.invoices.billingTools.state.busy
+            Caption { text: "Refresh saved records" }
+            Flow {
+                Layout.fillWidth: true; spacing: 8
+                AppButton { objectName: "refreshClients"; text: "Clients"; onClicked: backend.invoices.billingTools.refresh("clients") }
+                AppButton { objectName: "refreshInvoices"; text: "Invoices"; onClicked: backend.invoices.billingTools.refresh("invoices") }
+                AppButton { objectName: "refreshEstimates"; text: "Estimates"; onClicked: backend.invoices.billingTools.refresh("estimates") }
+                AppButton { objectName: "refreshPayments"; text: "Payments"; onClicked: backend.invoices.billingTools.refresh("allPayments") }
+            }
+            Caption {
+                Layout.fillWidth: true
+                visible: !!text
+                wrapMode: Text.WordWrap
+                text: backend.invoices.billingTools.state.busy ? "Refreshing…" : backend.invoices.billingTools.state.notice || backend.invoices.state.problem || backend.invoices.state.message
+            }
         }
 
         ColumnLayout {

@@ -27,24 +27,37 @@ ApplicationWindow {
     property string page: backend.state.panel
 
     property bool started: false
+    property bool positionReady: false
+
+    property bool centerResize: false
+    property real resizeCenterX: 0
+    property real resizeCenterY: 0
 
     property bool animateResize: false
 
-    property bool animating: resizeWidth.running || resizeHeight.running
+    readonly property bool animating: backend.resizeAnimating
 
     property bool reducedMotion: backend.reducedMotion
 
     property var bounds: ({x:0,y:0,width:1200,height:800})
 
-    minimumWidth: Math.min(page==="month" ? 778 : page==="timer" ? 650 : 540,bounds.width)
+    property real pendingMinimumWidth: 540
+    property real pendingMinimumHeight: 490
+    property real panelMinimumWidth: 540
+    minimumWidth: Math.min(panelMinimumWidth,bounds.width)
 
-    minimumHeight: Math.min(page==="month" ? (width<778 ? 780 : 490) : 490,bounds.height)
+    property real panelMinimumHeight: 490
+    minimumHeight: Math.min(panelMinimumHeight,bounds.height)
 
     width: 620; height: 620
 
-    Behavior on width { enabled: window.animateResize; NumberAnimation { id: resizeWidth; duration: window.started && !window.reducedMotion ? 180 : 0; easing.type: Easing.InOutCubic } }
 
-    Behavior on height { enabled: window.animateResize; NumberAnimation { id: resizeHeight; duration: window.started && !window.reducedMotion ? 180 : 0; easing.type: Easing.InOutCubic } }
+
+    function openSetupWizard() {
+        if(setupWizard.visible) return
+        backend.traceWizardOpening()
+        Qt.callLater(function() { setupWizard.open() })
+    }
 
     function fitPanel(keepWidth) {
 
@@ -52,13 +65,20 @@ ApplicationWindow {
 
         if(visibility===Window.Maximized || visibility===Window.FullScreen) return
 
-        animateResize=started && !reducedMotion
+        resizeCenterX=x+width/2
+        resizeCenterY=y+height/2
+        centerResize=true
+        pendingMinimumWidth=["invoices","clients","estimates"].includes(page) ? 600 : page==="month" ? 778 : page==="timer" ? 650 : 540
+        pendingMinimumHeight=page==="month" && bounds.width<778 ? 780 : 490
+        panelMinimumWidth=Math.min(panelMinimumWidth,pendingMinimumWidth)
+        panelMinimumHeight=Math.min(panelMinimumHeight,pendingMinimumHeight)
+        animateResize=false
 
-        resizeGuard.restart()
 
-        let w=keepWidth ? width : page==="month" ? 1040 : page==="timer" ? 780 : page==="settings" ? 720 : 620
 
-        let h=page==="month" ? 710 : page==="timer" ? 610 : page==="settings" ? 660 : 650
+        let w=keepWidth ? width : page==="invoices" || page==="estimates" ? 1220 : page==="clients" ? 820 : page==="month" ? 1040 : page==="timer" ? 780 : page==="settings" ? 720 : 620
+
+        let h=page==="invoices" || page==="estimates" ? 980 : page==="month" ? 710 : page==="timer" ? 610 : page==="settings" ? 660 : 650
         if(page==="settings" && backend.state.connectionSection) {
             const chrome=43+1+46
                          +(Theme.compact ? 8 : 12)+(Theme.compact ? 6 : 21)+settingsHeading.implicitHeight+(Theme.compact ? 6 : 8)+2
@@ -71,48 +91,68 @@ ApplicationWindow {
         if(page==="month" && w<778) h=850
         if(page==="timer" && w<620) h=820
 
-        height=Math.min(h,bounds.height-16)
+        positionDuringResize()
+        if(!backend.resizeMainWindow(Math.round(w),Math.round(Math.min(h,bounds.height-16)),resizeCenterX,resizeCenterY,started && positionReady && visible && !reducedMotion)) {
+            panelMinimumWidth=pendingMinimumWidth; panelMinimumHeight=pendingMinimumHeight
+            width=w; height=Math.min(h,bounds.height-16); positionDuringResize()
+        }
 
-        if(!keepWidth) width=w
+        centerResize=false
+        if(positionReady) positionSave.restart()
 
+    }
+
+    QtObject {
+        id: settingsRefit; objectName: "settingsRefitTimer"
+        readonly property bool running: backend.settingsFitPending
+        function restart() { backend.scheduleSettingsFit() }
+    }
+
+    Connections { target: backend.invoices; property string lastView: "list"; function onChanged() { let view=backend.invoices.state.view; if(view!==lastView && window.started && window.page==="invoices" && view==="edit") window.fitPanel(false); lastView=view } }
+
+    function positionDuringResize() {
+        if(!centerResize) return
         if(backend.state.settings.docked_mode) {
-
-            x=bounds.x+bounds.width-w-8; y=bounds.y+bounds.height-height-8
-
+            x=bounds.x+bounds.width-width-8
+            y=bounds.y+bounds.height-height-8
         } else {
-
-            x=Math.max(bounds.x,Math.min(x,bounds.x+bounds.width-w))
-
-            y=Math.max(bounds.y,Math.min(y,bounds.y+bounds.height-height))
-
-        }
-
-    }
-
-    Timer {
-        id: settingsRefit
-        objectName: "settingsRefitTimer"
-        interval: 20
-        onTriggered: {
-            if(window.page!=="settings") return
-            if(resizeWidth.running) restart()
-            else window.fitPanel(true)
+            x=Math.round(Math.max(bounds.x,Math.min(resizeCenterX-width/2,bounds.x+bounds.width-width)))
+            y=Math.round(Math.max(bounds.y,Math.min(resizeCenterY-height/2,bounds.y+bounds.height-height)))
         }
     }
 
-    Timer { id: resizeGuard; interval: 220; onTriggered: window.animateResize=false }
 
     onScreenChanged: if(started) fitPanel()
 
-    onWidthChanged: if(started && backend.state.settings.docked_mode) x=bounds.x+bounds.width-width-8
+    onWidthChanged: { if(centerResize) positionDuringResize(); else if(started && backend.state.settings.docked_mode) x=bounds.x+bounds.width-width-8 }
 
-    onHeightChanged: if(started && backend.state.settings.docked_mode) y=bounds.y+bounds.height-height-8
+    onHeightChanged: { if(centerResize) positionDuringResize(); else if(started && backend.state.settings.docked_mode) y=bounds.y+bounds.height-height-8 }
+
+    function placeInitialWindow() {
+        window.animateResize=false; window.centerResize=false
+        let placement=backend.initialWindowPlacement(window.width,window.height)
+        window.bounds=placement.bounds; window.x=placement.x; window.y=placement.y
+        window.positionReady=true
+    }
+    QtObject { id: initialPlacement; function restart() { backend.scheduleWindowPlacement() } }
+    QtObject { id: positionSave; function restart() { backend.schedulePositionSave() } }
+    Connections {
+        target: backend
+        function onUiScheduleChanged() {
+            if(!backend.resizeAnimating) { window.panelMinimumWidth=window.pendingMinimumWidth; window.panelMinimumHeight=window.pendingMinimumHeight }
+        }
+        function onSettingsFitRequested() { if(window.page==="settings") window.fitPanel(true) }
+        function onWindowPlacementRequested() { window.placeInitialWindow() }
+    }
+    onVisibleChanged: if(visible && !positionReady) initialPlacement.restart()
+    onXChanged: if(positionReady && visible && !centerResize) positionSave.restart()
+    onYChanged: if(positionReady && visible && !centerResize) positionSave.restart()
 
     onClosing: function(event) { event.accepted=false; backend.closeRequested() }
 
     Binding { target: Theme; property: "dark"; value: backend.state.settings.theme==="dark" || (backend.state.settings.theme==="system" && Application.styleHints.colorScheme===Qt.Dark) }
 
-    Binding { target: Theme; property: "compact"; value: window.height<600 }
+    Binding { target: Theme; property: "compact"; value: window.bounds.height<660 }
 
     Connections {
 
@@ -165,11 +205,21 @@ ApplicationWindow {
 
                         Layout.fillWidth: true; Layout.fillHeight: true
 
-                        DragHandler { target: null; onActiveChanged: if(active) { window.animateResize=false; resizeWidth.stop(); resizeHeight.stop(); window.startSystemMove() } }
+                        DragHandler { target: null; onActiveChanged: if(active) { window.animateResize=false; window.pendingMinimumWidth=window.panelMinimumWidth; window.pendingMinimumHeight=window.panelMinimumHeight; backend.cancelWindowResize(); window.startSystemMove() } }
 
                         TapHandler { onDoubleTapped: window.visibility===Window.Maximized ? window.showNormal() : window.showMaximized() }
 
                     }
+
+                    AppButton {
+                        id: syncStatusWidget; objectName: "syncStatus"
+                        visible: !backend.state.demo && backend.state.connected && (backend.state.sync.count>0 || backend.state.sync.online===false || backend.state.sync.message.length>0)
+                        quiet: true; implicitHeight: 28
+                        text: backend.state.sync.problems.length>0 ? "Review sync" : backend.state.sync.online===false ? "Offline" : backend.state.sync.count>0 ? backend.state.sync.count+" waiting" : "Cached data"
+                        tip: backend.state.sync.message || "Open connection settings to review sync."
+                        onClicked: backend.showSync()
+                    }
+                    BusyIndicator { running: backend.state.busy; visible: running; Layout.preferredWidth: 23; Layout.preferredHeight: 23 }
 
                     AppButton { glyph: "minimize"; Accessible.name: "Minimize"; quiet: true; implicitHeight: 28; onClicked: window.showMinimized() }
 
@@ -189,19 +239,23 @@ ApplicationWindow {
                 Layout.leftMargin: 14; Layout.rightMargin: 14; spacing: 4
                 z: 2
                 Repeater {
-                    model: [{key:"log",label:"Log time"},{key:"month",label:"Monthly hours"},{key:"timer",label:"Timer"},{key:"settings",label:"Settings"}]
+                    model: [{key:"log",label:"Log time",width:64},{key:"month",label:"Monthly hours",width:102},
+                            {key:"timer",label:"Timer",width:53},{key:"invoices",label:"Invoices",width:65},
+                            {key:"estimates",label:"Estimates",width:73},{key:"clients",label:"Clients",width:57},
+                            {key:"settings",label:"Settings",width:64}]
                     Button {
                         id: folderTab
                         required property var modelData
                         property bool selected: window.page===modelData.key
                         objectName: modelData.key+"Tab"
                         Layout.alignment: Qt.AlignBottom
-                        Layout.preferredHeight: selected ? 35 : 31
-                        Layout.preferredWidth: Math.min(122,(window.width-48)/4)
+                        Layout.preferredHeight: 35
+                        Layout.minimumWidth: modelData.width
+                        Layout.maximumWidth: modelData.width
                         text: modelData.label
                         Accessible.role: Accessible.PageTab
                         Accessible.name: text
-                        contentItem: Text { text: folderTab.text; color: folderTab.selected ? Theme.blue : Theme.muted; font.pixelSize: 13; font.bold: folderTab.selected; font.underline: false; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                        contentItem: Text { text: folderTab.text; color: folderTab.selected ? Theme.blue : Theme.muted; font.pixelSize: 13; font.weight: Font.Medium; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                         background: Canvas {
                             id: folderShape
                             property color fillColor: folderTab.selected ? Theme.surface : folderTab.hovered ? Theme.hover : Theme.page
@@ -228,15 +282,6 @@ ApplicationWindow {
                     }
                 }
                 Item { Layout.fillWidth: true }
-                AppButton {
-                    objectName: "syncStatus"
-                    visible: !backend.state.demo && backend.state.connected && (backend.state.sync.count>0 || backend.state.sync.online===false || backend.state.sync.message.length>0)
-                    quiet: true; implicitHeight: 28; Layout.maximumWidth: 190
-                    text: backend.state.sync.problems.length>0 ? (window.width<650 ? "Review sync" : "Sync needs review") : backend.state.sync.online===false ? (window.width<650 ? "Offline" : "Offline · "+backend.state.sync.count+" waiting") : (backend.state.sync.count>0 ? backend.state.sync.count+(window.width<650 ? " waiting" : " waiting to sync") : "Cached data")
-                    tip: backend.state.sync.message || "Changes are saved on this PC. Open connection settings to review sync."
-                    onClicked: backend.showSync()
-                }
-                BusyIndicator { running: backend.state.busy; visible: running; Layout.alignment: Qt.AlignVCenter; Layout.preferredWidth: 23; Layout.preferredHeight: 23 }
             }
 
             Item {
@@ -294,9 +339,14 @@ ApplicationWindow {
 
                     Text { Layout.fillWidth: true; visible: !!backend.state.warning; text: backend.state.warning; wrapMode: Text.WordWrap; color: Theme.muted; font.pixelSize: 11 }
 
+                    AppButton { visible: backend.state.localMode && !backend.state.clients.length; text: "Add local clients"; onClicked: backend.selectPanel("clients") }
                     AppButton { visible: !backend.state.connected; text: "Connect FreshBooks"; onClicked: backend.selectPanel("settings") }
 
                 }
+
+                InvoicesPanel { anchors.fill: parent; visible: window.page==="invoices" }
+                ClientsPanel { anchors.fill: parent; visible: window.page==="clients"; tools: backend.invoices.billingTools }
+                EstimatesPanel { anchors.fill: parent; visible: window.page==="estimates"; tools: backend.invoices.billingTools }
 
                 MonthPanel { objectName: "monthPanel"; clip: true; anchors.fill: parent; visible: window.page==="month" }
                 TimerPanel { objectName: "timerPanel"; anchors.fill: parent; visible: window.page==="timer" }
@@ -309,6 +359,7 @@ ApplicationWindow {
 
                     SettingsPanel {
                         id: settingsView; objectName: "settingsPanel"
+                        onSetupRequested: window.openSetupWizard()
                         Layout.fillWidth: true; Layout.fillHeight: true
                         onNaturalHeightChanged: if(window.started && window.page==="settings" && backend.state.connectionSection) settingsRefit.restart()
                     }
@@ -321,7 +372,7 @@ ApplicationWindow {
 
                     anchors.fill: parent; color: Theme.surface
 
-                    visible: window.animating || settingsRefit.running
+                    visible: false
 
                     Text { anchors.centerIn: parent; text: window.page==="log" ? "Log your day" : window.page==="month" ? "Monthly hours" : "Settings"; color: Theme.muted; font.pixelSize: 16 }
 
@@ -405,7 +456,7 @@ ApplicationWindow {
 
         header: Text { text: confirmDialog.title; color: Theme.ink; font.bold: true; font.pixelSize: 15; padding: 16 }
 
-        footer: Item { implicitHeight: 52; RowLayout { anchors.fill: parent; anchors.margins: 10; Item { Layout.fillWidth: true } AppButton { text: "Cancel"; onClicked: confirmDialog.reject() } AppButton { text: confirmDialog.title==="Delete time entry" ? "Delete entry" : "Continue"; primary: confirmDialog.title!=="Delete time entry"; onClicked: confirmDialog.accept() } } }
+        footer: Item { implicitHeight: 52; RowLayout { anchors.fill: parent; anchors.margins: 10; Item { Layout.fillWidth: true } AppButton { text: "Cancel"; onClicked: confirmDialog.reject() } AppButton { objectName: "confirmContinue"; text: confirmDialog.title==="Delete time entry" ? "Delete entry" : "Continue"; primary: confirmDialog.title!=="Delete time entry"; onClicked: confirmDialog.accept() } } }
 
         background: Rectangle { radius: 9; color: Theme.surface; border.color: Theme.line }
 
@@ -416,6 +467,8 @@ ApplicationWindow {
         onRejected: backend.answer(false)
 
     }
+
+    SetupWizard { id: setupWizard; parent: Overlay.overlay }
 
     UpdateDialog { id: updaterDialog; parent: Overlay.overlay }
     Connections {

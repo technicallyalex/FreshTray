@@ -78,6 +78,7 @@ def main():
         else:provider=Demo() if args.demo else FreshBooks(vault)
         controller = Controller(provider, vault, prefs, base/'assets', Path(__file__), args.demo)
         if args.qa_wizard or args.qa_panels or args.qa_billing:
+            controller.invoices.billingTools.payment_autosync_enabled = False
             if controller.offline and not args.qa_live_readonly:controller.offline.probe=lambda:False
             controller._updater.offline_mode=True;controller._updater.start_timer.stop()
         engine = QQmlApplicationEngine()

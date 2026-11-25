@@ -557,5 +557,6 @@ class Invoices(QObject):
     @Slot()
     def close(self):
         if not self.persist_draft():return False
+        self.billingTools.payment_timer.stop()
         self.poll.stop();self.checkpoint.stop();self.pool.shutdown(wait=True,cancel_futures=True)
         return True

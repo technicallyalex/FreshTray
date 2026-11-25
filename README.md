@@ -14,7 +14,7 @@ FreshTray is a portable Windows app for logging time with your FreshBooks accoun
 - **Offline work:** use previously downloaded lists and months, make changes without internet, and sync when you reconnect. Conflicts and uncertain submissions are kept for review.
 - **Personal preferences:** light and dark themes, remembered business/client choices, alphabetical or recently used dropdown sorting, startup, always-on-top and taskbar docking options.
 
-> **Optional testing:** [FreshTray 0.4 RC1](https://github.com/technicallyalex/FreshTray/releases/tag/v0.4.0-rc.1) adds invoicing, estimates, client management, and payment recording alongside the timer. Use **0.2** for everyday work unless you want to try the candidate and [report issues](https://github.com/technicallyalex/FreshTray/issues). [Billing guide](docs/INVOICES.md).
+> **Optional testing:** [FreshTray 0.4 RC2](https://github.com/technicallyalex/FreshTray/releases/tag/v0.4.0-rc.2) adds invoicing, estimates, client management, and payment recording alongside the timer. Use **0.2** for everyday work unless you want to try the candidate and [report issues](https://github.com/technicallyalex/FreshTray/issues). [Billing guide](docs/INVOICES.md).
 
 ## Getting started
 

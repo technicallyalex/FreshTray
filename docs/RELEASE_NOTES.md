@@ -1,3 +1,15 @@
+# FreshTray 0.4 RC2 — payment workflow
+
+**This is a testing prerelease. [FreshTray 0.2](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2) remains the recommended stable release.**
+
+- Pick the received date from a calendar in the invoice Payments dialog, or enter it directly.
+- New connected payments, corrections, and removals save locally and start syncing automatically. If FreshBooks is unreachable before the app sends a change, the app retries when it reconnects.
+- If FreshBooks may have received a payment change, the app holds it for review to avoid a duplicate. Payments queued by older builds still require explicit sync.
+
+See the [billing guide](INVOICES.md) and [QA results](RC_QA.md).
+
+---
+
 # FreshTray 0.4 RC1 — billing testing prerelease
 
 **Use [0.2](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2) for everyday work. Try this candidate if you want to test billing or [report an issue](https://github.com/technicallyalex/FreshTray/issues).**

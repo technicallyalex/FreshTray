@@ -48,7 +48,9 @@ FreshBooks mode caches downloaded invoices, catalogs and per-client unbilled ent
 
 Saving a connected-account invoice writes an encrypted local draft. **Sync saved drafts** explicitly creates or updates the invoices in FreshBooks. The confirmation warns that linked time/expenses may become billed there. This does not email clients. Existing line IDs, source linkage and tax metadata are retained, and updates send all retained invoice lines.
 
-Changed server versions block overwrite. Uncertain writes remain under Review and are not retried automatically. Check FreshBooks before using **I checked FreshBooks: retry**; retrying an invoice that already exists can duplicate it. **Keep local; do not sync** retains the invoice without another provider write. A provider total mismatch blocks PDF export until the calculation is reviewed. Payment, recurring-invoice and invoice-email APIs are not invoked by this build.
+Changed server versions block overwrite. Uncertain writes remain under Review and are not retried automatically. Check FreshBooks before using **I checked FreshBooks: retry**; retrying an invoice that already exists can duplicate it. **Keep local; do not sync** retains the invoice without another provider write. A provider total mismatch blocks PDF export until the calculation is reviewed.
+
+In **Payments**, use the calendar button to choose the received date or type it directly. New connected payment records, corrections, and removals save locally and start syncing immediately. If FreshBooks is unreachable before submission, the change stays saved and retries automatically. If FreshBooks may have received it, review the payment history before trying again. Payments queued by older builds still require explicit sync.
 
 ## Verification and limits
 

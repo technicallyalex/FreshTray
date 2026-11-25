@@ -29,6 +29,7 @@ class BillingServer(Server):
         self.linked = {}
         self.writes = []
         self.offline = False
+        self.payment_preflight_down = False
         self.lost_payment = False
 
     def __call__(self, method, path, body=None, token=None):
@@ -43,6 +44,8 @@ class BillingServer(Server):
         if '/invoices/invoices' in url.path:
             suffix = url.path.split('/invoices/invoices', 1)[1].strip('/')
             if method=='GET':
+                if suffix and self.payment_preflight_down:
+                    raise ApiError('Invoice check timed out before any write', uncertain=True)
                 result = {'invoice': self.invoices[int(suffix)]} if suffix else {'invoices':list(self.invoices.values()),'pages':1}
                 return self.result(result)
             key = int(suffix) if suffix else 501
@@ -175,27 +178,70 @@ with TemporaryDirectory() as folder:
     assert bill.draft['id']==inv_id and len(server.invoices)==1
 
     values=dict(amount='40.00', date=date.today().isoformat(), method='Cash', note='QA')
-    tools.recordPayment('',values,False)
+    # The automatic payment path must leave unrelated manual changes queued.
+    tools.saveClient('', dict(company='Unsubmitted customer'))
+    server.offline=True
+    assert tools.recordPayment('',values,False)
+    settle(owner)
     assert tools.state['pending'] and not tools.state['payments']
-    tools.sync()
+    assert tools.state['currentPaymentPending'] and 'automatically' in tools.state['notice']
+    saved=Vault(folder/'vault.dpapi').get('billing_v1')['billing_tools'][bill.namespace()]['queue']
+    assert any(job['kind']=='payments' and job['status']=='queued' and job['automatic'] for job in saved)
+    writes = len(server.writes)
+    assert not tools.recordPayment('',values,False)
+    assert len(server.writes)==writes
+    server.offline=False
+    server.payment_preflight_down=True
+    tools.sync_payments()
+    settle(owner)
+    assert any(job['kind']=='payments' and job['status']=='queued' for job in tools.state['pending'])
+    assert len(server.writes)==writes
+    server.payment_preflight_down=False
+    tools.payment_timer.setInterval(30)
+    settle(owner)
+    until=time.monotonic()+5
+    while tools.state['currentPaymentPending']:
+        app.processEvents()
+        time.sleep(.006)
+        assert time.monotonic()<until, 'Queued payment did not restart automatically'
+    tools.payment_timer.setInterval(15000)
     settle(owner)
     assert bill.state['totals']['balance']=='70.00' and len(tools.state['payments'])==1, tools.notice
+    assert len(server.writes)==writes+1 and server.writes[-1]==('payments','POST')
+    pending=tools.state['pending']
+    assert len(pending)==1 and pending[0]['kind']=='clients'
+    tools.discard(pending[0]['id'])
+    owner.answer(True)
     record=tools.state['payments'][0]['id']
-    tools.recordPayment(record,dict(values,amount='50.00'),False)
-    tools.sync()
+    assert tools.recordPayment(record,dict(values,amount='50.00'),False)
     settle(owner)
     assert bill.state['totals']['balance']=='60.00'
-    tools.recordPayment(record,{},True)
-    tools.sync()
+    assert tools.recordPayment(record,{},True)
+    settle(owner)
+    assert bill.state['totals']['balance']=='110.00' and not tools.state['payments']
+    tools.saveClient('', dict(company='Still unsubmitted'))
+    tools.enqueue('payments', 'Previously queued payment', '', dict(
+        invoiceid=501, date=values['date'], type='Cash', note='Legacy QA',
+        amount=dict(amount='40.00',code='USD')), invoice_id='501', method='Cash')
+    tools.sync_payments()
+    settle(owner)
+    assert not tools.state['payments'], 'A legacy payment synced before confirmation'
+    tools.confirmLegacyPaymentSync('501')
+    owner.answer(True)
+    settle(owner)
+    pending=tools.state['pending']
+    assert len(pending)==1 and pending[0]['kind']=='clients'
+    tools.discard(pending[0]['id'])
+    owner.answer(True)
+    assert tools.recordPayment(tools.state['payments'][0]['id'],{},True)
     settle(owner)
     assert bill.state['totals']['balance']=='110.00' and not tools.state['payments']
     server.lost_payment=True
-    tools.recordPayment('',values,False)
-    tools.sync()
+    assert tools.recordPayment('',values,False)
     settle(owner)
     assert tools.state['pending'][0]['status']=='review'
     count=len(server.writes)
-    tools.sync()
+    tools.sync_payments()
     settle(owner)
     assert len(server.writes)==count, 'Ambiguous payment was resent'
     tools.refresh('payments')

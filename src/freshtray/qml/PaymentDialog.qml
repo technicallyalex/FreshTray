@@ -10,9 +10,17 @@ Dialog {
     property var state: tools.state
     property var row: ({})
     property string balance: String(invoice.totals.balance || "0.00")
+    property string suggestedAmount: ""
+    onBalanceChanged: {
+        if (amount && !row.id && amount.text === suggestedAmount) {
+            suggestedAmount = balance
+            amount.text = balance
+        }
+    }
     function edit(payment) {
         row = payment
-        amount.text = payment.amount || balance
+        suggestedAmount = payment.amount || balance
+        amount.text = suggestedAmount
         received.text = payment.date || state.date
         method.currentIndex = Math.max(0, state.methods.indexOf(payment.method || "Cash"))
         note.text = payment.note || ""
@@ -31,7 +39,7 @@ Dialog {
             width: scroll.availableWidth
             spacing: 9
             Text { Layout.fillWidth: true; text: "Paid " + dialog.invoice.totals.paid + "  ·  Balance " + dialog.balance + " " + dialog.invoice.draft.currency; color: Theme.ink; font.bold: true }
-            Caption { Layout.fillWidth: true; text: dialog.state.errors.payments || dialog.state.notice || ""; wrapMode: Text.WordWrap; visible: !!text }
+            Caption { Layout.fillWidth: true; text: dialog.state.busy && dialog.state.currentPaymentPending ? "Syncing payment…" : dialog.state.notice || dialog.state.errors.payments || ""; wrapMode: Text.WordWrap; visible: !!text }
             Caption { text: "Payment history"; font.bold: true }
             Repeater {
                 model: dialog.visible ? dialog.state.payments : []
@@ -39,8 +47,8 @@ Dialog {
                     required property var modelData
                     Layout.fillWidth: true
                     Caption { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: modelData.date + " · " + modelData.method + " · " + modelData.amount + (modelData.note ? "\n" + modelData.note : "") }
-                    AppButton { text: "Edit"; visible: modelData.editable; enabled: !dialog.state.busy; onClicked: dialog.edit(modelData) }
-                    AppButton { text: "Remove"; visible: modelData.editable; enabled: !dialog.state.busy; onClicked: { removal.paymentId = modelData.id; removal.open() } }
+                    AppButton { text: "Edit"; visible: modelData.editable; enabled: !dialog.state.busy && !dialog.state.currentPaymentPending; onClicked: dialog.edit(modelData) }
+                    AppButton { text: "Remove"; visible: modelData.editable; enabled: !dialog.state.busy && !dialog.state.currentPaymentPending; onClicked: { removal.paymentId = modelData.id; removal.open() } }
                 }
             }
             Caption { visible: !dialog.state.payments.length; text: "No payment records available." }
@@ -54,7 +62,26 @@ Dialog {
                     Caption { text: "Amount" }
                     Field { id: amount; objectName: "paymentAmount"; Layout.fillWidth: true }
                     Caption { text: "Received date" }
-                    Field { id: received; Layout.fillWidth: true; placeholderText: "YYYY-MM-DD" }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+                        Field { id: received; objectName: "paymentReceivedDate"; Layout.fillWidth: true; placeholderText: "YYYY-MM-DD"; Accessible.name: "Received date" }
+                        AppButton {
+                            objectName: "paymentCalendar"
+                            glyph: "calendar"
+                            tip: "Choose received date"
+                            Accessible.name: "Choose received date"
+                            onClicked: { picker.selected = received.text; picker.open() }
+                        }
+                        DatePicker {
+                            id: picker
+                            objectName: "paymentDatePicker"
+                            parent: Overlay.overlay
+                            x: Math.max(8,(parent.width-width)/2)
+                            y: Math.max(8,(parent.height-height)/2)
+                            onPicked: day => received.text = day
+                        }
+                    }
                     Caption { text: "Method" }
                     Select { id: method; Layout.fillWidth: true; model: dialog.state.methods }
                     Caption { text: "Note / reference" }
@@ -65,16 +92,15 @@ Dialog {
                     AppButton {
                         objectName: "savePayment"
                         text: dialog.row.id ? "Save correction" : "Record payment"
-                        primary: true; enabled: !dialog.state.busy
+                        primary: true; enabled: !dialog.state.busy && !dialog.state.currentPaymentPending
                         onClicked: {
-                            dialog.tools.recordPayment(dialog.row.id || "", {amount:amount.text, date:received.text, method:method.currentText, note:note.text}, false)
-                            if (["Payment history updated.", "Saved locally. Sync pending changes when ready."].includes(dialog.tools.state.notice))
+                            if (dialog.tools.recordPayment(dialog.row.id || "", {amount:amount.text, date:received.text, method:method.currentText, note:note.text}, false))
                                 dialog.edit({})
                         }
                     }
                 }
             }
-            BillingPending { Layout.fillWidth: true; tools: dialog.tools }
+            BillingPending { Layout.fillWidth: true; tools: dialog.tools; currentInvoicePaymentsOnly: true }
         }
     }
     footer: RowLayout {

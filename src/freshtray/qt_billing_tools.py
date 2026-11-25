@@ -1,16 +1,16 @@
-"""Qt billing workspace. Connected changes are saved before explicit sync."""
+"""Qt billing workspace. Payment changes are saved before automatic sync."""
 from copy import deepcopy
 from datetime import date
 from pathlib import Path
 from uuid import uuid4
 
-from PySide6.QtCore import QObject, Property, Signal, Slot, QUrl
+from PySide6.QtCore import QObject, Property, Signal, Slot, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QFileDialog
 
 from .api import ApiError
 from .billing import blank_line, invoice_html, mailto, number, totals, validate
-from .billing_features import (BillingAPI, CLIENT_FIELDS, PAYMENT_METHODS, client_values,
+from .billing_features import (BillingAPI, CLIENT_FIELDS, PAYMENT_METHODS, PaymentReadUnavailable, client_values,
                                estimate_payload, invoice_from_estimate, local_payment,
                                migrate_payment_ids, new_estimate, payment_values,
                                remote_client, remote_estimate, remote_payment)
@@ -33,6 +33,11 @@ class BillingTools(QObject):
         self.errors = {}
         self.context = None
         invoices.changed.connect(self.invoice_changed)
+        self.payment_autosync_enabled = True
+        self.payment_timer = QTimer(self)
+        self.payment_timer.setInterval(15000)
+        self.payment_timer.timeout.connect(self.sync_payments)
+        self.payment_timer.start()
 
     def invoice_changed(self):
         key = self.namespace()
@@ -90,11 +95,14 @@ class BillingTools(QObject):
                              method=row.get('method', 'Other'), note=row.get('note', ''),
                              editable=row.get('editable', not invoice_remote)) for row in payment_rows]
         pending = [dict(id=job['id'], kind=job['kind'], label=job['label'],
+                        automatic=bool(job.get('automatic')), invoiceId=job.get('invoice_id', ''),
                         status='review' if job['status']=='sending' and not self.invoices.busy else job['status'],
                         issue=job.get('issue', '')) for job in ws.get('queue', [])]
         return dict(clients=deepcopy(clients), estimates=sorted(estimates, key=lambda row: (row['date'], row['number']), reverse=True),
                     estimate=deepcopy(draft or {}), totals=calculated, preview=self.preview if draft else '',
                     items=self.invoices.catalogs()['items'], pending=pending, payments=payment_list,
+                    currentPaymentPending=bool(invoice_remote and any(job['invoiceId']==invoice_remote for job in pending)),
+                    paymentInvoiceId=invoice_remote,
                     methods=list(PAYMENT_METHODS), date=date.today().isoformat(), notice=self.notice,
                     errors=dict(self.errors), local=self.invoices.local, busy=self.invoices.busy,
                     canPay=bool(invoice.get('id') and (self.invoices.local or
@@ -261,24 +269,46 @@ class BillingTools(QObject):
             jobs = self.workspace(key, data).setdefault('queue', [])
             group = links.get('estimate_id') or links.get('invoice_id') or target
             if any(job['kind']==kind and (job.get('group')==group if group else job['payload']==payload) for job in jobs):
-                raise ValueError('Review or sync the existing pending change first.')
+                raise ValueError('This invoice already has a pending payment change.' if kind == 'payments'
+                                 else 'Review or sync the existing pending change first.')
             jobs.append(dict(id=uuid4().hex, kind=kind, label=label, target=target, payload=payload,
                              expected=(previous or {}).get('revision'), status='queued', group=group, **links))
         self.store.mutate(write)
-        self.notice = 'Saved locally. Sync pending changes when ready.'
+        self.notice = ('Payment saved locally.' if links.get('automatic')
+                       else 'Saved locally. Sync pending changes when ready.')
         self.changed.emit()
 
     @Slot()
     def sync(self):
+        self._sync_pending(False)
+
+    @Slot(str)
+    def confirmLegacyPaymentSync(self, invoice_id):
+        if invoice_id:
+            self.owner.confirm('Sync the previously queued payment for this invoice?',
+                               lambda: self._sync_pending(False, payment_invoice=invoice_id))
+
+    def sync_payments(self):
+        if not self.payment_autosync_enabled or self.owner._s['busy']:
+            return
+        self._sync_pending(True)
+
+    def _sync_pending(self, automatic, payment_invoice=''):
         if self.invoices.busy or self.invoices.local:
             return
         try:
             key = self.namespace()
+            queued = [job for job in self.workspace(key).get('queue', [])
+                      if job['status']=='queued' and bool(job.get('automatic'))==automatic
+                      and (not payment_invoice or job.get('invoice_id')==payment_invoice)]
+            if not queued or (automatic and not self.owner.remote_api.connected):
+                return
             api = self.remote()
-            queued = [job for job in self.workspace(key).get('queue', []) if job['status']=='queued']
             def work():
-                if queued and self.owner.offline and not self.owner.offline.probe():
-                    raise ValueError('FreshBooks is unreachable. The changes are still queued on this device.')
+                if self.owner.offline and not self.owner.offline.probe():
+                    message = ('Payment saved locally. It will sync automatically when FreshBooks is reachable.'
+                               if automatic else 'FreshBooks is unreachable. The changes are still queued on this device.')
+                    raise ValueError(message)
                 for job in queued:
                     def set_status(data, status, issue=''):
                         row = next(x for x in self.workspace(key, data)['queue'] if x['id']==job['id'])
@@ -288,6 +318,9 @@ class BillingTools(QObject):
                         raw = api.apply(job)
                         self.commit_remote(key, job, raw, api)
                     except Exception as exc:
+                        if isinstance(exc, PaymentReadUnavailable):
+                            self.store.mutate(lambda data: set_status(data, 'queued'))
+                            raise ValueError('Payment saved locally. It will sync automatically when FreshBooks is reachable.') from exc
                         if isinstance(exc, ApiError) and exc.status in (401, 403) and not exc.uncertain:
                             self.store.mutate(lambda data: set_status(data, 'queued'))
                             raise
@@ -299,11 +332,15 @@ class BillingTools(QObject):
             def done(ok):
                 self.reload_estimate()
                 self.reload_invoice(key)
-                self.notice = 'Pending changes confirmed by FreshBooks.' if ok else 'A change needs review before it can be retried.'
+                if automatic:
+                    self.notice = ('Payment history updated in FreshBooks.' if ok
+                                   else 'FreshBooks did not confirm the payment change. Review it before trying again.')
+                else:
+                    self.notice = 'Pending changes confirmed by FreshBooks.' if ok else 'A change needs review before it can be retried.'
                 if ok and any(job['kind']=='clients' for job in queued):
                     self.owner.api.clear('catalog')
                     self.owner.load_catalog(self.owner._s['businessIndex'])
-            self.run(work, done, 'sync')
+            self.run(work, done, 'payments' if automatic else 'sync')
         except Exception as exc:
             self.error(exc)
 
@@ -586,11 +623,11 @@ class BillingTools(QObject):
                 self.error(exc)
         self.owner.confirm('Create an invoice draft from this estimate? Review the copied lines and totals before syncing or sharing it.', action)
 
-    @Slot(str, 'QVariantMap', bool)
+    @Slot(str, 'QVariantMap', bool, result=bool)
     def recordPayment(self, payment_id, values, remove):
         inv = self.invoices.draft
         if not inv or self.invoices.busy:
-            return
+            return False
         try:
             if inv.get('deleted') or inv.get('status','').lower() in ('void','voided'):
                 raise ValueError('Payments cannot be changed on this invoice.')
@@ -604,7 +641,7 @@ class BillingTools(QObject):
                 self.invoices.persist_draft()
                 self.notice = 'Payment history updated.'
                 self.invoices.emit()
-                return
+                return True
             if not inv.get('remote') or inv['sync']!='synced':
                 raise ValueError('Sync the invoice before recording a FreshBooks payment.')
             rid = str(inv['remote']['id'])
@@ -624,9 +661,13 @@ class BillingTools(QObject):
                 payload = dict(invoiceid=int(rid), date=item['date'], type=method, note=item['note'],
                                amount=dict(amount=item['amount'], code=inv['currency']))
             self.enqueue('payments', 'Remove payment' if remove else ('Update payment' if old else 'Record payment') +
-                         ' for invoice ' + inv['number'], payment_id, payload, old, invoice_id=rid, method=method)
+                         ' for invoice ' + inv['number'], payment_id, payload, old, invoice_id=rid,
+                         method=method, automatic=True)
+            self.sync_payments()
+            return True
         except Exception as exc:
             self.error(exc)
+            return False
 
     @Slot()
     def preparePayments(self):

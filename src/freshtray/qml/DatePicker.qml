@@ -10,7 +10,11 @@ Popup {
     padding: 14
     modal: true
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-    onOpened: { const parts=selected.split("-"); cursor=parts.length===3 ? new Date(+parts[0],+parts[1]-1,+parts[2],12) : new Date() }
+    onOpened: {
+        const parts = selected.split("-")
+        const requested = parts.length === 3 ? new Date(+parts[0], +parts[1]-1, +parts[2], 12) : new Date(NaN)
+        cursor = isNaN(requested.getTime()) || Qt.formatDate(requested,"yyyy-MM-dd") !== selected ? new Date() : requested
+    }
     background: Rectangle { color: Theme.surface; radius: 9; border.color: Theme.line }
     ColumnLayout {
         anchors.fill: parent; spacing: 5

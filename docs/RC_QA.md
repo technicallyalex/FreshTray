@@ -1,3 +1,14 @@
+# 0.4 RC2 verification
+
+[0.2 remains the recommended stable release](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2).
+
+- All 157 unit tests passed. The packaged Windows app opened the payment calendar, saved its selected date, and recorded, corrected, and removed payments offline.
+- Connected fixtures verified immediate automatic submission, durable queuing while offline, safe retry after a failed read before submission, and review after a lost write response. An older payment stayed queued until confirmed, and confirming it left unrelated client changes queued.
+- The packaged EXE checked live FreshBooks estimates, payment history, and individual invoice payments in a read-only profile.
+- Live payment writes were outside this test.
+
+---
+
 # 0.4 RC1 verification
 
 [0.2 remains the recommended stable release](https://github.com/technicallyalex/FreshTray/releases/tag/v0.2).

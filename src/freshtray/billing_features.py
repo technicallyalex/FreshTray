@@ -158,6 +158,10 @@ def migrate_payment_ids(invoice):
         row.setdefault('note', '')
 
 
+class PaymentReadUnavailable(ApiError):
+    """A payment could not be checked before any write was attempted."""
+
+
 class BillingAPI(InvoiceAPI):
     def resource(self, kind, remote_id=''):
         path = self.base + '/' + RESOURCES[kind][0]
@@ -177,13 +181,14 @@ class BillingAPI(InvoiceAPI):
         kind, payload = operation['kind'], operation['payload']
         target = operation['target']
         if target:
-            current = self.get_record(kind, target)
+            current = (self.payment_preflight(lambda: self.get_record(kind, target))
+                       if kind == 'payments' else self.get_record(kind, target))
             expected = operation.get('expected')
             if expected is not None and expected != current.get('updated'):
                 raise ValueError('This record changed in FreshBooks. Refresh and review it before editing again.')
         if kind == 'payments':
             payload = dict(payload, send_client_notification=False)
-            invoice = self.get(payload['invoiceid'])
+            invoice = self.payment_preflight(lambda: self.get(payload['invoiceid']))
             outstanding = (invoice.get('outstanding') or {}).get('amount')
             if outstanding is None:
                 outstanding = number(invoice['amount']['amount']) - number(invoice['paid']['amount'])
@@ -203,3 +208,12 @@ class BillingAPI(InvoiceAPI):
         if not identity(kind, raw):
             raise ApiError('FreshBooks did not confirm the record. Check it before retrying.', uncertain=True)
         return raw
+
+    @staticmethod
+    def payment_preflight(read):
+        try:
+            return read()
+        except ApiError as exc:
+            if exc.uncertain or exc.status == 429:
+                raise PaymentReadUnavailable('Could not check FreshBooks before sending the payment.') from exc
+            raise

@@ -5,7 +5,9 @@ ColumnLayout {
     id: root
     required property var tools
     property var state: tools.state
-    visible: !state.local && state.pending.length > 0
+    property bool currentInvoicePaymentsOnly: false
+    property var pending: currentInvoicePaymentsOnly ? state.pending.filter(row => row.kind === "payments" && row.invoiceId === state.paymentInvoiceId) : state.pending
+    visible: !state.local && pending.length > 0
     spacing: 6
     RowLayout {
         Layout.fillWidth: true
@@ -13,19 +15,25 @@ ColumnLayout {
         AppButton {
             objectName: "syncBillingChanges"
             text: "Sync pending changes"
-            enabled: !root.state.busy && root.state.pending.some(row => row.status === "queued")
-            onClicked: backend.confirmBillingSync()
+            visible: root.pending.some(row => !row.automatic && row.status === "queued")
+            enabled: !root.state.busy
+            onClicked: {
+                if (root.currentInvoicePaymentsOnly)
+                    root.tools.confirmLegacyPaymentSync(root.state.paymentInvoiceId)
+                else
+                    backend.confirmBillingSync()
+            }
         }
     }
     Repeater {
-        model: root.visible ? root.state.pending : []
+        model: root.visible ? root.pending : []
         delegate: RowLayout {
             required property var modelData
             Layout.fillWidth: true
             Caption {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
-                text: modelData.label + " · " + modelData.status + (modelData.issue ? "\n" + modelData.issue : "")
+                text: modelData.label + " · " + (modelData.automatic && modelData.status === "queued" ? "Waiting to sync automatically" : modelData.status) + (modelData.issue ? "\n" + modelData.issue : "")
             }
             AppButton { text: "Remove pending change"; enabled: !root.state.busy; onClicked: root.tools.discard(modelData.id) }
         }

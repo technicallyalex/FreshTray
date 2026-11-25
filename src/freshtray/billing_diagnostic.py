@@ -4,7 +4,7 @@ import faulthandler
 import json
 import time
 
-from PySide6.QtCore import QPointF, Qt, QTimer, qInstallMessageHandler
+from PySide6.QtCore import QObject, QMetaObject, Q_ARG, QPointF, Qt, QTimer, qInstallMessageHandler
 from PySide6.QtGui import QWindow
 from PySide6.QtTest import QTest
 
@@ -123,9 +123,19 @@ def run_billing_check(app, owner, window, folder, live):
         yield 'Estimate conversion and repeat conversion'
         click('invoicePayments')
         yield 'Opened invoice payments'
-        args = dict(date=tools.state['date'], method='Cash', note='QA receipt')
+        click('paymentCalendar')
+        yield 'Opened the payment calendar'
+        picker = window.findChild(QObject, 'paymentDatePicker')
+        assert picker and picker.property('opened'), 'Received date calendar did not open'
+        assert QMetaObject.invokeMethod(picker, 'picked', Qt.DirectConnection, Q_ARG(str, '2024-01-03'))
+        field = item_named(window.contentItem(), 'paymentReceivedDate')
+        assert field and field.property('text') == '2024-01-03', 'Calendar date did not reach the payment form'
+        QTest.keyClick(window, Qt.Key_Escape)
+        yield 'Selected a payment date'
+        args = dict(date=field.property('text'), method='Cash', note='QA receipt')
         tools.recordPayment('', dict(args, amount='100.00'), False)
         assert bill.state['totals']['balance']=='147.50', tools.notice
+        assert tools.state['payments'][0]['date']=='2024-01-03'
         tools.recordPayment('', dict(args, amount='147.50'), False)
         assert bill.draft['status']=='Paid' and len(tools.state['payments'])==2, tools.notice
         first = tools.state['payments'][0]['id']
